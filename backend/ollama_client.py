@@ -43,8 +43,8 @@ class OllamaClient:
             raise OllamaError("Ollama returned invalid embeddings.")
         return vectors
 
-    def generate(self, prompt: str) -> str:
-        result = self._post("/api/generate", {"model": settings.llm_model, "prompt": prompt, "stream": False, "format": "json", "think": False, "options": {"temperature": 0, "num_predict": 1400}})
+    def generate(self, prompt: str, response_schema: dict | None = None) -> str:
+        result = self._post("/api/generate", {"model": settings.llm_model, "prompt": prompt, "stream": False, "format": response_schema or "json", "think": False, "options": {"temperature": 0, "num_predict": 1400}})
         if not isinstance(result.get("response"), str):
             raise OllamaError("Ollama returned invalid generation output.")
         return result["response"]

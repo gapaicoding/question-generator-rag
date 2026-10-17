@@ -19,19 +19,42 @@ class InvalidGeneration(ValueError):
 
 def _json_object(raw: str) -> dict:
     clean = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.I)
+    if not clean:
+        raise InvalidGeneration("LLM response was empty (0 characters).")
     try:
         value = json.loads(clean)
     except json.JSONDecodeError:
         start, end = clean.find("{"), clean.rfind("}")
         if start < 0 or end < start:
-            raise InvalidGeneration("LLM returned invalid structured output.")
+            raise InvalidGeneration(f"LLM response did not contain a JSON object ({len(raw)} characters).")
         try:
             value = json.loads(clean[start:end + 1])
         except json.JSONDecodeError as exc:
-            raise InvalidGeneration("LLM returned invalid structured output.") from exc
+            raise InvalidGeneration(f"Malformed JSON at line {exc.lineno}, column {exc.colno} ({len(raw)} characters).") from exc
     if not isinstance(value, dict):
-        raise InvalidGeneration("LLM returned invalid structured output.")
+        raise InvalidGeneration(f"LLM JSON root must be an object, received {type(value).__name__}.")
     return value
+
+
+def _generation_schema(count: int) -> dict:
+    question_schema = {
+        "type": "object",
+        "properties": {
+            "question": {"type": "string", "minLength": 1},
+            "options": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 4, "maxItems": 4},
+            "answer": {"type": "string", "minLength": 1},
+            "explanation": {"type": "string", "minLength": 1},
+            "source_ids": {"type": "array", "items": {"type": "integer", "minimum": 1}, "minItems": 1},
+        },
+        "required": ["question", "options", "answer", "explanation", "source_ids"],
+        "additionalProperties": False,
+    }
+    return {
+        "type": "object",
+        "properties": {"questions": {"type": "array", "items": question_schema, "minItems": count, "maxItems": count}},
+        "required": ["questions"],
+        "additionalProperties": False,
+    }
 
 
 def generate_questions(client, topic: str, difficulty: str, count: int, chunks: list[dict], scope: str | None = None) -> list[Question]:
@@ -46,11 +69,12 @@ def generate_questions(client, topic: str, difficulty: str, count: int, chunks: 
         f"Create exactly {count} {difficulty} multiple choice questions following this user prompt: {topic}. "
         "Each question must have exactly four distinct options, one correct answer matching one option, "
         "a nonempty explanation, and source_ids containing one or more source numbers from the context. "
-        "Return only JSON of shape {\"questions\":[{\"question\":\"...\",\"options\":[\"...\",\"...\",\"...\",\"...\"],\"answer\":\"...\",\"explanation\":\"...\",\"source_ids\":[1]}]}. No Markdown.\n\n"
+        "Return only JSON matching the response schema. No Markdown.\n\n"
         f"Source material:\n{context}"
     )
+    response_schema = _generation_schema(count)
     for attempt in range(2):
-        raw = client.generate(prompt)
+        raw = client.generate(prompt, response_schema=response_schema)
         try:
             data = _json_object(raw)
             items = data["questions"]
@@ -74,10 +98,16 @@ def generate_questions(client, topic: str, difficulty: str, count: int, chunks: 
                 questions.append(question)
             return questions
         except (KeyError, TypeError, ValueError) as exc:
-            logger.warning("Question output validation failed (attempt %d/2): %s", attempt + 1, exc)
+            if isinstance(exc, InvalidGeneration):
+                safe_detail = str(exc)
+            elif isinstance(exc, KeyError):
+                safe_detail = "A required JSON field is missing."
+            else:
+                safe_detail = "Generated fields do not match the expected types or values."
+            logger.warning("Question output validation failed (attempt %d/2): %s", attempt + 1, safe_detail)
             if attempt:
-                raise InvalidGeneration(f"LLM output remained invalid after retry: {exc}") from exc
-            prompt += ("\n\nYour previous output was invalid: " + str(exc) + ". Correct this specific issue. "
+                raise InvalidGeneration(f"LLM output remained invalid after retry: {safe_detail}") from exc
+            prompt += ("\n\nYour previous output was invalid: " + safe_detail + ". Correct this specific issue. "
                        "For every question, provide exactly four distinct options and copy the correct answer "
                        "verbatim from one of those options. Return the exact requested question count as valid JSON only.")
     raise InvalidGeneration("LLM returned invalid structured output.")

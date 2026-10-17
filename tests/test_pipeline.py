@@ -1,13 +1,15 @@
 from types import SimpleNamespace
 
 import pymupdf
+import pytest
+import requests
 from fastapi.testclient import TestClient
 
 from backend.chunker import chunk_pages
-from backend.generator import InvalidGeneration, generate_questions
+from backend.generator import InvalidGeneration, _generation_schema, generate_questions
 from backend.main import app
 import backend.main as main
-from backend.ollama_client import OllamaError
+from backend.ollama_client import OllamaClient, OllamaError
 from backend.pdf_parser import InvalidPDF, extract_pages
 from backend.vector_store import VectorStore
 
@@ -81,7 +83,8 @@ def test_api_basic():
 
 def test_generation_attaches_retrieved_source():
     class FakeClient:
-        def generate(self, prompt):
+        def generate(self, prompt, response_schema=None):
+            assert response_schema == _generation_schema(1)
             return '{"questions":[{"question":"Q?","options":["a","b","c","d"],"answer":"a","explanation":"Because.","source_ids":[1]}]}'
 
     result = generate_questions(FakeClient(), "topic", "easy", 1, [{"content": "Fact", "page": 4, "chunk_index": 2}])
@@ -120,7 +123,7 @@ class FakeOllama:
     def embed(self, texts):
         return [[0.1, 0.2] for _ in texts]
 
-    def generate(self, prompt):
+    def generate(self, prompt, response_schema=None):
         return '{"questions":[{"question":"Apa fungsi respirasi?","options":["Pertukaran gas","Pencernaan","Gerak","Pendengaran"],"answer":"Pertukaran gas","explanation":"Materi menyebut respirasi sebagai pertukaran gas.","source_ids":[1]}]}'
 
 
@@ -212,6 +215,123 @@ def test_api_reports_ollama_and_scanned_pdf_errors(monkeypatch, tmp_path):
     assert response.json()["detail"] == "Ollama service is unavailable."
 
 
+def test_ollama_timeout_is_reported_as_controlled_error(monkeypatch):
+    def timeout(*args, **kwargs):
+        raise requests.Timeout("injected timeout")
+
+    monkeypatch.setattr("backend.ollama_client.requests.post", timeout)
+
+    with pytest.raises(OllamaError, match="timed out"):
+        OllamaClient().embed(["test text"])
+
+
+def test_ollama_generation_sends_structured_output_schema(monkeypatch):
+    captured = {}
+
+    class Response:
+        status_code = 200
+        ok = True
+
+        def json(self):
+            return {"response": "{}"}
+
+    def post(url, json, timeout):
+        captured.update(json)
+        return Response()
+
+    monkeypatch.setattr("backend.ollama_client.requests.post", post)
+    schema = _generation_schema(3)
+
+    result = OllamaClient().generate("make questions", response_schema=schema)
+
+    assert result == "{}"
+    assert captured["format"] == schema
+
+
+def test_upload_handles_vector_store_failure_and_cleans_up(monkeypatch, tmp_path):
+    class BrokenInsertStore(MemoryStore):
+        def add(self, chunks, embeddings):
+            self.documents[chunks[0]["document_id"]] = chunks
+            raise RuntimeError("injected Chroma insert failure")
+
+    broken_store = BrokenInsertStore()
+    monkeypatch.setattr(main, "store", lambda: broken_store)
+    monkeypatch.setattr(main, "ollama", FakeOllama)
+    monkeypatch.setattr(
+        main,
+        "settings",
+        SimpleNamespace(max_pdf_bytes=25 * 1024 * 1024, chunk_size=1200, chunk_overlap=200, top_k=5, max_retrieval_distance=1.2, upload_path=tmp_path),
+    )
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.post("/documents", files={"file": ("failure.pdf", make_pdf(), "application/pdf")})
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Document indexing failed."
+    assert broken_store.documents == {}
+    assert list(tmp_path.glob("*.pdf")) == []
+
+
+@pytest.mark.parametrize("endpoint", ["/search", "/generate"])
+def test_retrieval_store_failure_returns_controlled_error(monkeypatch, tmp_path, endpoint):
+    class BrokenSearchStore(MemoryStore):
+        def search(self, document_id, embedding, top_k, section=None):
+            raise RuntimeError("injected Chroma query failure")
+
+    broken_store = BrokenSearchStore()
+    broken_store.documents["doc"] = [{"content": "A sufficiently long piece of source material for the failure path.", "page": 1, "chunk_index": 0}]
+    monkeypatch.setattr(main, "store", lambda: broken_store)
+    monkeypatch.setattr(main, "ollama", FakeOllama)
+    patch_api(monkeypatch, tmp_path)
+    monkeypatch.setattr(main, "store", lambda: broken_store)
+    client = TestClient(app, raise_server_exceptions=False)
+    if endpoint == "/search":
+        response = client.post(endpoint, json={"document_id": "doc", "query": "source"})
+        expected = "Document search failed."
+    else:
+        response = client.post(endpoint, json={"document_id": "doc", "topic": "source", "question_count": 1})
+        expected = "Question generation failed."
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": expected}
+
+
+def test_generation_ollama_failure_returns_service_unavailable(monkeypatch, tmp_path):
+    memory_store = patch_api(monkeypatch, tmp_path)
+    memory_store.documents["doc"] = [
+        {"content": "A sufficiently long passage about respiration and gas exchange.", "page": 1, "chunk_index": 0},
+    ]
+
+    class BrokenGeneratorOllama(FakeOllama):
+        def generate(self, prompt, response_schema=None):
+            raise OllamaError("Ollama request timed out.")
+
+    monkeypatch.setattr(main, "ollama", BrokenGeneratorOllama)
+    response = TestClient(app).post(
+        "/generate",
+        json={"document_id": "doc", "topic": "respiration", "question_count": 1},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Ollama request timed out."
+
+
+def test_delete_store_failure_returns_controlled_error(monkeypatch, tmp_path):
+    class BrokenDeleteStore(MemoryStore):
+        def delete(self, document_id):
+            raise RuntimeError("injected Chroma delete failure")
+
+    broken_store = BrokenDeleteStore()
+    broken_store.documents["doc"] = [{"content": "indexed", "page": 1, "chunk_index": 0}]
+    monkeypatch.setattr(main, "store", lambda: broken_store)
+    monkeypatch.setattr(main, "settings", SimpleNamespace(upload_path=tmp_path))
+
+    response = TestClient(app, raise_server_exceptions=False).delete("/documents/doc")
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Document deletion failed."}
+
+
 def test_requested_section_detection():
     assert main.requested_section("Buat soal dari Lesson 01 tentang greeting") == "Lesson 1"
     assert main.requested_section("Fokus pada BAB II") == "Bab II"
@@ -286,7 +406,7 @@ def test_generate_falls_back_to_full_document_when_no_sections_exist(monkeypatch
 
 def test_generation_rejects_invalid_model_output_after_retry():
     class InvalidClient:
-        def generate(self, prompt):
+        def generate(self, prompt, response_schema=None):
             return '{"questions":[{"question":"Q?","options":["a","b","c","d"],"answer":"missing","explanation":"Because.","source_ids":[1]}]}'
 
     chunks = [{"content": "Fact", "page": 4, "chunk_index": 2}]
@@ -295,3 +415,38 @@ def test_generation_rejects_invalid_model_output_after_retry():
         assert False, "Expected invalid generation output to be rejected."
     except InvalidGeneration:
         pass
+
+
+def test_malformed_generation_diagnostics_do_not_log_model_content(caplog):
+    private_text = "private-material-fragment"
+
+    class MalformedClient:
+        def generate(self, prompt, response_schema=None):
+            return private_text
+
+    chunks = [{"content": "Some sufficiently long source content.", "page": 1, "chunk_index": 0}]
+
+    with pytest.raises(InvalidGeneration, match="did not contain a JSON object") as error:
+        generate_questions(MalformedClient(), "topic", "easy", 1, chunks)
+
+    assert private_text not in str(error.value)
+    assert private_text not in caplog.text
+
+
+def test_validation_diagnostics_do_not_log_invalid_field_content(caplog):
+    private_text = "private-answer-fragment"
+
+    class WrongTypesClient:
+        def generate(self, prompt, response_schema=None):
+            return (
+                '{"questions":[{"question":"Q?","options":"' + private_text
+                + '","answer":"a","explanation":"Because.","source_ids":[1]}]}'
+            )
+
+    chunks = [{"content": "Some sufficiently long source content.", "page": 1, "chunk_index": 0}]
+
+    with pytest.raises(InvalidGeneration) as error:
+        generate_questions(WrongTypesClient(), "topic", "easy", 1, chunks)
+
+    assert private_text not in str(error.value)
+    assert private_text not in caplog.text
