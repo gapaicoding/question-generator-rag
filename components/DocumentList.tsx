@@ -31,12 +31,12 @@ export function DocumentList({
             className={`flex items-center justify-between gap-3 rounded border p-3 text-sm ${
               isSelected
                 ? "border-black bg-zinc-50 dark:border-white dark:bg-zinc-900"
-                : "border-zinc-200 dark:border-zinc-800"
+                : "border-zinc-500"
             }`}
           >
             <button type="button" onClick={() => onSelect(doc)} className="flex-1 text-left">
               <p className="font-medium">{doc.filename}</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {doc.pages} halaman · {doc.chunks} chunk
                 {doc.sections.length > 0 && ` · ${doc.sections.join(", ")}`}
                 {" · "}
@@ -52,7 +52,7 @@ export function DocumentList({
               <button
                 type="button"
                 onClick={() => onDelete(doc.document_id)}
-                className="text-xs text-red-600 hover:underline"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded px-2 text-xs text-red-600 hover:underline dark:text-red-400"
               >
                 Hapus
               </button>

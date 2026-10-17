@@ -38,7 +38,7 @@ export function UploadForm({ onUploaded }: { onUploaded: (result: UploadResult) 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-zinc-500 p-4">
       <h2 className="text-lg font-semibold">1. Upload PDF</h2>
       <input ref={inputRef} type="file" accept="application/pdf" className="text-sm" required />
       <button
@@ -48,7 +48,7 @@ export function UploadForm({ onUploaded }: { onUploaded: (result: UploadResult) 
       >
         {loading ? "Mengindeks..." : "Upload & Index"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
     </form>
   );
 }

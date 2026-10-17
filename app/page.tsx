@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { UploadForm } from "@/components/UploadForm";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { DocumentList, type DocumentSummary } from "@/components/DocumentList";
 import { SearchPanel } from "@/components/SearchPanel";
 import { QuestionList } from "@/components/QuestionList";
@@ -16,6 +17,7 @@ interface Question {
 
 export default function Home() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(true);
   const [selected, setSelected] = useState<DocumentSummary | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
@@ -27,6 +29,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const refreshDocuments = useCallback(async (selectId?: string) => {
+    setLoadingDocuments(true);
     try {
       const res = await fetch("/api/documents");
       const data = await res.json();
@@ -40,6 +43,8 @@ export default function Home() {
       }
     } catch (err) {
       setListError(err instanceof Error ? err.message : "Failed to load documents.");
+    } finally {
+      setLoadingDocuments(false);
     }
   }, []);
 
@@ -93,14 +98,21 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <h1 className="text-2xl font-bold">PDF Question Generator</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">PDF Question Generator</h1>
+        <ThemeToggle />
+      </div>
 
       <UploadForm onUploaded={(result) => refreshDocuments(result.document_id)} />
 
-      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+      <div className="flex flex-col gap-3 rounded-lg border border-zinc-500 p-4">
         <h2 className="text-lg font-semibold">Dokumen Terindex</h2>
-        {listError && <p className="text-sm text-red-600">{listError}</p>}
-        <DocumentList documents={documents} selectedId={selected?.document_id ?? null} onSelect={setSelected} onDelete={handleDelete} />
+        {listError && <p className="text-sm text-red-600 dark:text-red-400">{listError}</p>}
+        {loadingDocuments ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Memuat dokumen...</p>
+        ) : (
+          <DocumentList documents={documents} selectedId={selected?.document_id ?? null} onSelect={setSelected} onDelete={handleDelete} />
+        )}
       </div>
 
       {selected && (
@@ -109,14 +121,14 @@ export default function Home() {
 
           <form
             onSubmit={handleGenerate}
-            className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800"
+            className="flex flex-col gap-3 rounded-lg border border-zinc-500 p-4"
           >
             <h2 className="text-lg font-semibold">Generate Soal dari &quot;{selected.filename}&quot;</h2>
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="Topik, mis. sistem pernapasan manusia"
-              className="rounded border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="rounded border border-zinc-500 px-3 py-2 text-sm dark:bg-zinc-900"
               required
             />
             <div className="flex gap-3">
@@ -128,7 +140,7 @@ export default function Home() {
                   max={20}
                   value={questionCount}
                   onChange={(e) => setQuestionCount(Number(e.target.value))}
-                  className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded border border-zinc-500 px-3 py-2 dark:bg-zinc-900"
                 />
               </label>
               <label className="flex flex-1 flex-col text-sm">
@@ -136,7 +148,7 @@ export default function Home() {
                 <select
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                  className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+                  className="rounded border border-zinc-500 px-3 py-2 dark:bg-zinc-900"
                 >
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
@@ -151,7 +163,7 @@ export default function Home() {
             >
               {generating ? "Membuat soal..." : "Generate"}
             </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           </form>
 
           <QuestionList questions={questions} />

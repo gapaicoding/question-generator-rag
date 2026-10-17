@@ -12,7 +12,7 @@ export function QuestionList({ questions }: { questions: Question[] }) {
   return (
     <ol className="flex flex-col gap-4">
       {questions.map((q, i) => (
-        <li key={i} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+        <li key={i} className="rounded-lg border border-zinc-500 p-4">
           <p className="font-medium">
             {i + 1}. {q.question}
           </p>
@@ -27,7 +27,7 @@ export function QuestionList({ questions }: { questions: Question[] }) {
             ))}
           </ul>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{q.explanation}</p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             Sumber: {q.sources.map((s) => `hal. ${s.page}`).join(", ")}
           </p>
         </li>
