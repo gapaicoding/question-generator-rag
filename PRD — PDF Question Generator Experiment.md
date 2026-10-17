@@ -1,27 +1,31 @@
-# PRD — PDF Question Generator Experiment
+# PRD — PDF Question Generator (Next.js Edition)
 
 ## 1. Informasi Proyek
 
-**Nama Proyek:** PDF Question Generator Experiment\
-**Versi:** v0.1 Experimental\
-**Status:** Ready for Development\
-**Tujuan:** Membuktikan pipeline lokal untuk menghasilkan soal dan jawaban secara otomatis dari materi PDF menggunakan Ollama, embedding, ChromaDB, dan FastAPI.
+**Nama Proyek:** PDF Question Generator\
+**Versi:** v0.2 — Migrasi ke Next.js + Cloud\
+**Status:** Planned\
+**Tujuan:** Migrasi pipeline RAG dari stack lokal (FastAPI + Streamlit + Ollama + ChromaDB) menjadi aplikasi full-stack Next.js yang bisa di-deploy gratis ke Vercel, menggunakan LLM API cloud dan vector database hosted sebagai pengganti Ollama dan ChromaDB.
 
 ---
 
 # 2. Latar Belakang
 
-Proyek ini merupakan eksperimen awal untuk membangun sistem yang dapat membaca materi pembelajaran dalam format PDF, mengubah isi PDF menjadi embedding, menyimpan embedding ke vector database, mengambil bagian materi yang relevan berdasarkan topik, lalu menghasilkan soal secara otomatis menggunakan LLM lokal.
+Versi v0.1 (lihat `CHANGELOG.md` dan riwayat commit) sudah membuktikan bahwa pipeline RAG — extract PDF → chunking → embedding → vector search → generate soal — bekerja secara lokal menggunakan Ollama dan ChromaDB.
 
-Eksperimen ini harus dapat berjalan secara lokal tanpa menggunakan API AI berbayar.
+Masalah pada v0.1 untuk kebutuhan deployment:
 
-Target utama pada fase ini bukan membuat aplikasi production-ready, melainkan membuktikan bahwa pipeline RAG dapat berjalan dengan benar dan menghasilkan soal yang grounded pada isi PDF.
+- Ollama adalah proses server yang harus menyala terus dan butuh RAM besar (model `qwen3:4b` perlu ±3 GB hanya untuk load weight). Ini tidak bisa berjalan di platform serverless seperti Vercel, dan tidak nyaman di VPS kecil (≤4 GB RAM, 1 vCPU).
+- ChromaDB `PersistentClient` menyimpan data di filesystem lokal (`./chroma_data`). Filesystem di lingkungan serverless bersifat ephemeral, sehingga tidak bisa dipakai sebagai penyimpanan permanen.
+- Streamlit sebagai frontend tidak cocok dideploy bersama Next.js/Vercel.
+
+Versi v0.2 bertujuan menghilangkan dependensi pada proses server yang menyala terus (Ollama) dan penyimpanan disk lokal (ChromaDB file, `uploads/`), diganti dengan layanan cloud yang punya free tier, sambil mempertahankan seluruh logic RAG yang sudah terbukti bekerja (chunking per halaman, retrieval terskop per dokumen, generate soal grounded, source attribution).
 
 ---
 
-# 3. Tujuan Eksperimen
+# 3. Tujuan Migrasi
 
-Sistem harus mampu melakukan flow berikut:
+Flow fungsional **tidak berubah** dari v0.1:
 
 ```text
 PDF
@@ -32,7 +36,7 @@ Chunking
 ↓
 Generate Embedding
 ↓
-Store in ChromaDB
+Store in Vector DB
 ↓
 User memberikan topik
 ↓
@@ -49,1489 +53,370 @@ Generate Questions
 Return Structured JSON
 ```
 
-Target akhir eksperimen:
+Yang berubah hanya **di mana** setiap langkah dieksekusi dan **teknologi** yang dipakai, bukan kontrak fungsionalnya:
 
-```text
-1 PDF
-→ berhasil diproses
-→ tersimpan sebagai chunks di ChromaDB
-→ user memasukkan topik
-→ sistem mengambil materi relevan
-→ menghasilkan 5 soal pilihan ganda
-→ memiliki jawaban
-→ memiliki penjelasan
-→ memiliki referensi halaman PDF
-```
+| Langkah | v0.1 (lokal) | v0.2 (Next.js/cloud) |
+|---|---|---|
+| Server | FastAPI (Python) | Next.js API Routes (TypeScript) |
+| UI | Streamlit | Next.js App Router (React) |
+| PDF extraction | PyMuPDF | `pdf-parse` / `unpdf` (Node) |
+| Embedding | Ollama + `nomic-embed-text` | Google Gemini `text-embedding-004` (API) |
+| LLM generation | Ollama + `qwen3:4b` | Google Gemini `gemini-flash` (API) |
+| Vector store | ChromaDB (file lokal) | Postgres + `pgvector` (Neon, hosted) |
+| File upload storage | `./uploads/` lokal | Diproses in-memory saat upload, tidak perlu disimpan permanen |
+| Hosting | Localhost | Vercel (Hobby, gratis) |
 
 ---
 
 # 4. Scope
 
-## 4.1 In Scope
+## 4.1 In Scope (v0.2)
 
-Fitur yang wajib dibuat:
+1. Migrasi backend dari FastAPI ke Next.js API Routes.
+2. Migrasi frontend dari Streamlit ke Next.js (App Router, React).
+3. Upload PDF via form Next.js, diproses di API route (tanpa menyimpan file ke disk server).
+4. Extract text per halaman menggunakan library Node (`pdf-parse` atau `unpdf`).
+5. Chunking dengan metadata halaman (logic sama seperti `chunker.py`, ditulis ulang di TypeScript).
+6. Generate embedding via Google Gemini embedding API.
+7. Simpan chunk + embedding + metadata di Postgres (`pgvector`) hosted di Neon.
+8. Semantic search terfilter per `document_id` (tidak boleh bocor antar dokumen, sama seperti v0.1).
+9. Generate soal via Google Gemini LLM API, dengan prompt grounding yang sama seperti v0.1.
+10. Structured output JSON (soal, pilihan, jawaban, penjelasan, referensi halaman) — schema tidak berubah dari v0.1.
+11. Deploy ke Vercel (Hobby plan, gratis).
+12. Environment variable untuk semua kredensial (Gemini API key, Neon connection string).
 
-1. Upload file PDF.
-2. Extract text menggunakan PyMuPDF.
-3. Extract text per halaman.
-4. Memecah text menjadi chunks.
-5. Menyimpan metadata halaman pada setiap chunk.
-6. Generate embedding menggunakan Ollama.
-7. Embedding model menggunakan `nomic-embed-text`.
-8. Menyimpan chunks dan embedding ke ChromaDB.
-9. Semantic search berdasarkan topik.
-10. Retrieve chunk paling relevan.
-11. Generate soal menggunakan Ollama.
-12. LLM menggunakan model Qwen kecil.
-13. Mendukung soal pilihan ganda.
-14. Mendukung konfigurasi jumlah soal.
-15. Mendukung difficulty.
-16. Menghasilkan output JSON terstruktur.
-17. Menampilkan referensi sumber halaman.
-18. Menyediakan REST API melalui FastAPI.
-19. Menyediakan Swagger UI untuk testing.
-20. Menyimpan ChromaDB secara persistent di lokal.
+## 4.2 Out of Scope (v0.2)
 
----
-
-# 5. Out of Scope
-
-Jangan implementasikan fitur berikut pada versi eksperimen:
-
-- Next.js frontend.
-- Supabase.
-- PostgreSQL.
-- pgvector.
-- Authentication.
-- User registration.
-- Login.
-- Teacher role.
-- Student role.
-- Admin dashboard.
+- Ollama (dihapus total, diganti API cloud).
+- ChromaDB (dihapus total, diganti `pgvector`).
+- Streamlit (dihapus total, diganti Next.js UI).
+- Penyimpanan file PDF permanen di server (tidak perlu, PDF diproses sekali saat upload lalu dibuang).
+- Authentication, multi-user, role-based access.
 - Payment.
-- Cloud deployment.
-- OCR.
-- PDF scan/image recognition.
-- Multiple users.
-- Multi-tenant.
-- Question history.
-- Question editing UI.
-- Quiz attempt.
-- Automatic scoring.
-- Analytics.
-- Streaming response.
-- Background worker.
-- Queue system.
-- Redis.
-- Docker, kecuali dibutuhkan untuk development convenience.
-- Cloud AI API.
-- OpenAI API.
-- Gemini API.
-- Claude API.
-
-Fokus hanya pada validasi pipeline AI lokal.
+- OCR / PDF hasil scan.
+- Streaming response token-by-token (boleh ditambah di versi berikutnya, bukan wajib v0.2).
+- Background worker/queue (Vercel function sudah cukup untuk skala eksperimen; jika PDF besar menyebabkan timeout, baru dipertimbangkan di v0.3).
 
 ---
 
-# 6. Technology Stack
+# 5. Technology Stack
 
-Gunakan stack berikut.
-
-## Backend
+## Framework
 
 ```text
-Python 3.11+
-FastAPI
-Uvicorn
+Next.js 14+ (App Router)
+TypeScript
+```
+
+## Hosting
+
+```text
+Vercel (Hobby plan)
 ```
 
 ## PDF Processing
 
 ```text
-PyMuPDF / fitz
+pdf-parse atau unpdf (Node-compatible, jalan di serverless function)
 ```
 
-## AI Runtime
+## Embedding
 
 ```text
-Ollama
+Google Gemini API — text-embedding-004 (free tier)
 ```
 
-## Embedding Model
+## LLM Generation
 
 ```text
-nomic-embed-text
+Google Gemini API — gemini-flash / gemini-flash-lite (free tier)
 ```
 
-## LLM
-
-Prioritas:
+Alternatif jika kuota Gemini habis atau butuh model open-source (mis. keluarga Qwen seperti v0.1):
 
 ```text
-qwen3:4b
+Groq API (free tier, cepat)
+OpenRouter API (model :free, termasuk Qwen)
 ```
 
-Jika terlalu berat pada mesin development:
+Provider harus dikonfigurasi lewat environment variable, bukan hardcoded, agar mudah berpindah tanpa mengubah source code (prinsip sama dengan v0.1 §11).
+
+## Vector Database
 
 ```text
-qwen3:1.7b
+PostgreSQL + pgvector extension
+Hosting: Neon (free tier, auto-sleep saat idle)
 ```
 
-Agent harus membuat konfigurasi model melalui environment variable sehingga model dapat diganti tanpa mengubah source code.
+Alternatif: Pinecone (dedicated vector DB, free tier ~100.000 vector) jika tidak ingin mengelola skema SQL sendiri.
+
+## Validation
+
+```text
+Zod (pengganti Pydantic schema di sisi TypeScript)
+```
 
 ---
 
-# 7. Vector Database
+# 6. Target Environment
 
-Gunakan:
-
-```text
-ChromaDB
-```
-
-Mode:
+Deployment target menggantikan "development machine" di v0.1:
 
 ```text
-PersistentClient
+Compute: Vercel serverless functions (Hobby plan, gratis)
+Database: Neon Postgres + pgvector (free tier, 0.5 GB storage, 100 jam compute/bulan)
+LLM & Embedding: Google Gemini API (free tier)
 ```
 
-Data harus disimpan lokal pada:
+Batasan yang harus diperhatikan:
 
-```text
-./chroma_data/
-```
-
-Jangan menggunakan in-memory database untuk implementasi final eksperimen.
+- Vercel Hobby function timeout terbatas (±10 detik default). PDF besar atau jumlah chunk banyak berisiko timeout — upload & indexing harus dipecah per batch kecil atau di-skip sebagian chunk kalau timeout mendekat.
+- Neon free tier auto-scale ke nol saat idle — request pertama setelah idle lama (cold start database) akan sedikit lebih lambat.
+- Free tier Gemini punya rate limit (±10-15 request/menit) — cukup untuk pemakaian personal/demo, tidak untuk banyak pengguna bersamaan.
 
 ---
 
-# 8. Target Environment
-
-Development machine:
-
-```text
-OS:
-Windows
-
-Processor:
-AMD Ryzen 5 PRO 4650U
-
-RAM:
-16 GB
-
-GPU:
-AMD Radeon integrated
-
-AI inference:
-CPU-first
-```
-
-Implementasi harus tetap ringan.
-
-Jangan menggunakan model besar >7B sebagai default.
-
----
-
-# 9. High-Level Architecture
+# 7. High-Level Architecture
 
 ```text
                     ┌────────────────────┐
-                    │      User/API      │
+                    │   Browser (React)  │
+                    │   Next.js UI       │
                     └─────────┬──────────┘
                               │
                               ▼
                     ┌────────────────────┐
-                    │      FastAPI       │
+                    │  Next.js API Routes│
+                    │  (Vercel Function) │
                     └─────────┬──────────┘
                               │
-                ┌─────────────┴──────────────┐
-                │                            │
-                ▼                            ▼
-        ┌───────────────┐            ┌───────────────┐
-        │ PDF Processor │            │ Question      │
-        │ PyMuPDF       │            │ Generator     │
-        └───────┬───────┘            └───────▲───────┘
-                │                            │
-                ▼                            │
-        ┌───────────────┐                    │
-        │ Chunking      │                    │
-        └───────┬───────┘                    │
-                │                            │
-                ▼                            │
-        ┌───────────────┐                    │
-        │ Ollama        │                    │
-        │ Embedding     │                    │
-        └───────┬───────┘                    │
-                │                            │
-                ▼                            │
-        ┌───────────────┐                    │
-        │ ChromaDB      │                    │
-        └───────┬───────┘                    │
-                │                            │
-                ▼                            │
-        ┌───────────────┐                    │
-        │ Retrieval     │────────────────────┘
-        └───────────────┘
+                ┌─────────────┼──────────────┐
+                │             │              │
+                ▼             ▼              ▼
+        ┌───────────────┐ ┌──────────┐ ┌───────────────┐
+        │ PDF Parser    │ │ Gemini   │ │ Gemini        │
+        │ (pdf-parse)   │ │ Embedding│ │ LLM Generate  │
+        └───────┬───────┘ └────┬─────┘ └───────▲───────┘
+                │              │               │
+                ▼              ▼               │
+        ┌───────────────┐ ┌──────────────┐     │
+        │ Chunking      │→│ Neon Postgres│─────┘
+        └───────────────┘ │ + pgvector   │
+                           └──────────────┘
 ```
 
 ---
 
-# 10. Recommended Project Structure
-
-Gunakan struktur berikut.
+# 8. Recommended Project Structure
 
 ```text
 pdf-question-generator/
 │
-├── backend/
-│   │
-│   ├── main.py
-│   │
-│   ├── config.py
-│   │
-│   ├── schemas.py
-│   │
-│   ├── pdf_parser.py
-│   │
-│   ├── chunker.py
-│   │
-│   ├── embeddings.py
-│   │
-│   ├── vector_store.py
-│   │
-│   ├── retriever.py
-│   │
-│   ├── generator.py
-│   │
-│   ├── ollama_client.py
-│   │
-│   └── requirements.txt
+├── app/
+│   ├── page.tsx                 # UI utama (upload, search, generate)
+│   ├── layout.tsx
+│   └── api/
+│       ├── documents/
+│       │   └── route.ts         # POST upload, DELETE document
+│       ├── search/
+│       │   └── route.ts         # POST semantic search
+│       └── generate/
+│           └── route.ts         # POST generate questions
 │
-├── uploads/
+├── lib/
+│   ├── config.ts                # Env var loader (ganti config.py)
+│   ├── pdf-parser.ts            # ganti pdf_parser.py
+│   ├── chunker.ts                # ganti chunker.py
+│   ├── embeddings.ts             # panggil Gemini embedding API
+│   ├── vector-store.ts           # query/insert ke Neon pgvector, ganti vector_store.py
+│   ├── generator.ts              # panggil Gemini LLM + parsing JSON, ganti generator.py
+│   └── schemas.ts                # Zod schema, ganti schemas.py
 │
-├── chroma_data/
+├── components/
+│   ├── UploadForm.tsx
+│   ├── SearchPanel.tsx
+│   └── QuestionList.tsx
+│
+├── drizzle/ (atau prisma/)       # migration schema untuk pgvector
 │
 ├── tests/
-│   ├── test_pdf_parser.py
-│   ├── test_chunker.py
-│   ├── test_vector_store.py
-│   └── test_api.py
+│   ├── chunker.test.ts
+│   ├── vector-store.test.ts
+│   └── api.test.ts
 │
 ├── .env.example
 ├── .gitignore
+├── package.json
 ├── README.md
 └── PRD.md
 ```
 
-Agent boleh menambahkan file/helper lain jika diperlukan, tetapi jangan mengubah boundary utama sistem.
-
 ---
 
-# 11. Environment Variables
-
-Buat `.env.example`.
-
-Minimal:
+# 9. Environment Variables
 
 ```env
-OLLAMA_BASE_URL=http://localhost:11434
+GEMINI_API_KEY=
 
-OLLAMA_LLM_MODEL=qwen3:4b
-
-OLLAMA_EMBED_MODEL=nomic-embed-text
-
-CHROMA_PATH=./chroma_data
-
-UPLOAD_PATH=./uploads
+DATABASE_URL=                  # connection string Neon (postgres + pgvector)
 
 DEFAULT_CHUNK_SIZE=1200
-
 DEFAULT_CHUNK_OVERLAP=200
-
 DEFAULT_TOP_K=5
+MAX_RETRIEVAL_DISTANCE=1.2
+
+MAX_PDF_BYTES=26214400         # 25MB, sama seperti v0.1
 ```
 
-Jangan hardcode konfigurasi model di banyak file.
+Tidak ada lagi `OLLAMA_BASE_URL`, `CHROMA_PATH`, `UPLOAD_PATH` — digantikan konfigurasi provider cloud di atas.
 
 ---
 
-# 12. Functional Requirements
+# 10. Functional Requirements
 
-## FR-01 — Health Check
+Kontrak API **tidak berubah** dari v0.1 (lihat perilaku di `backend/main.py` dan `backend/schemas.py` sebagai referensi), hanya dipindah ke Next.js route handler:
 
-Endpoint:
-
-```http
-GET /health
+```text
+POST /api/documents   → upload & index PDF
+POST /api/search      → semantic search, terfilter document_id
+POST /api/generate    → generate soal dari topik
+DELETE /api/documents/:id → hapus document + vector terkait
+GET  /api/health      → cek koneksi ke Gemini & Neon
 ```
 
-Response:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-Idealnya juga melakukan pengecekan apakah Ollama dapat diakses.
-
-Contoh:
-
-```json
-{
-  "status": "ok",
-  "ollama": true
-}
-```
+Validasi, struktur output soal (`question`, `options`, `answer`, `explanation`, `sources[].page`), retrieval-before-generation, dan larangan LLM mengarang nomor halaman — semua requirement ini **tetap berlaku**, hanya implementasinya pindah bahasa/provider.
 
 ---
 
-# 13. FR-02 — Upload dan Index PDF
+# 11. Structured Output Handling
 
-Endpoint:
+Sama seperti v0.1 §26: Gemini API kadang membungkus JSON dengan markdown fence atau menambahkan teks lain. Route `generate` harus:
 
-```http
-POST /documents
-```
-
-Input:
-
-```text
-multipart/form-data
-
-file: PDF
-```
-
-Sistem harus:
-
-1. Memvalidasi file PDF.
-2. Menyimpan file sementara/lokal.
-3. Membaca PDF.
-4. Extract text per page.
-5. Menghasilkan chunk.
-6. Generate embedding untuk masing-masing chunk.
-7. Menyimpan chunk ke ChromaDB.
-8. Menyimpan metadata.
-9. Mengembalikan document ID.
-
-Example response:
-
-```json
-{
-  "document_id": "uuid",
-  "filename": "materi-ipa.pdf",
-  "pages": 20,
-  "chunks": 54,
-  "status": "indexed"
-}
-```
+- membersihkan markdown fence sebelum `JSON.parse`;
+- validasi hasil parse dengan Zod schema;
+- maksimal satu retry dengan prompt koreksi jika invalid;
+- return error terkontrol jika tetap gagal (bukan infinite retry).
 
 ---
 
-# 14. PDF Extraction Requirement
-
-Gunakan PyMuPDF.
-
-Text harus dibaca per halaman.
-
-Internal representation:
-
-```python
-[
-    {
-        "page": 1,
-        "text": "..."
-    },
-    {
-        "page": 2,
-        "text": "..."
-    }
-]
-```
-
-Halaman harus menggunakan numbering manusia:
+# 12. Testing Requirements
 
 ```text
-1, 2, 3, ...
+Vitest atau Jest (pengganti pytest)
 ```
 
-bukan zero-based numbering pada response API.
+Minimal test yang harus porting dari v0.1:
+
+```text
+chunker: ukuran chunk, overlap, metadata halaman tidak hilang
+vector-store: insert, query, filter document_id, delete
+api: health check, upload PDF invalid, generate dengan document tidak ada
+```
+
+Test Gemini API (embedding & generation) sebaiknya di-mock, dipisahkan dari unit test agar tidak bergantung kuota API saat CI berjalan.
 
 ---
 
-# 15. PDF Validation
+# 13. Development Sequence
 
-Reject apabila:
-
-- file bukan PDF;
-- file kosong;
-- PDF tidak memiliki text extractable;
-- PDF corrupted.
-
-Gunakan response HTTP yang sesuai.
-
-Contoh:
-
-```json
-{
-  "detail": "PDF contains no extractable text."
-}
-```
-
-OCR tidak perlu diimplementasikan.
-
----
-
-# 16. Chunking Requirement
-
-Chunking tidak boleh hanya memotong text secara random tanpa metadata.
-
-Setiap chunk minimal mempunyai:
-
-```json
-{
-  "document_id": "...",
-  "filename": "materi.pdf",
-  "page": 12,
-  "chunk_index": 7,
-  "content": "..."
-}
-```
-
-Target default:
+## Phase 1 — Setup Next.js & Database
 
 ```text
-chunk size:
-±1200 characters/tokens-equivalent sederhana
-
-overlap:
-±200
+Inisialisasi project Next.js + TypeScript
+Setup Neon project + enable pgvector extension
+Buat schema tabel (documents, chunks dengan kolom vector)
 ```
 
-Tidak perlu implementasi tokenizer kompleks pada fase pertama.
-
-Prioritaskan readable chunks.
-
-Jangan menggabungkan metadata halaman yang salah.
-
----
-
-# 17. Embedding Requirement
-
-Gunakan Ollama endpoint embedding.
-
-Model:
+## Phase 2 — PDF Processing (porting dari Python)
 
 ```text
-nomic-embed-text
+Port pdf_parser.py → pdf-parser.ts
+Port chunker.py → chunker.ts
+Test unit untuk memastikan hasil chunking konsisten dengan v0.1
 ```
 
-Flow:
+## Phase 3 — Embedding & Vector Store
 
 ```text
-chunk text
-
-↓
-
-Ollama embedding API
-
-↓
-
-vector
-
-↓
-
-ChromaDB
+Integrasi Gemini embedding API
+Implementasi insert/query ke pgvector
+Test retrieval: similarity search terfilter document_id
 ```
 
-Embedding harus dilakukan melalui reusable `ollama_client`.
-
-Jangan membuat HTTP implementation Ollama berulang di banyak module.
-
----
-
-# 18. ChromaDB Collection
-
-Gunakan satu collection awal:
+## Phase 4 — Generation
 
 ```text
-pdf_materials
+Port generator.py → generator.ts
+Prompt grounding sama seperti v0.1 §23
+Structured output parsing + retry sekali
 ```
 
-Setiap record:
+## Phase 5 — API Routes & UI
 
 ```text
-id
-document
-embedding
-metadata
+/api/documents, /api/search, /api/generate, /api/health
+UI: UploadForm, SearchPanel, QuestionList
 ```
 
-ID direkomendasikan:
+## Phase 6 — Deploy
 
 ```text
-{document_id}:{page}:{chunk_index}
-```
-
-Contoh:
-
-```text
-a35d...:12:3
-```
-
-Metadata:
-
-```json
-{
-  "document_id": "a35d...",
-  "filename": "materi-ipa.pdf",
-  "page": 12,
-  "chunk_index": 3
-}
+Push ke GitHub
+Connect ke Vercel
+Set environment variables (GEMINI_API_KEY, DATABASE_URL)
+Deploy & verifikasi end-to-end di production URL
 ```
 
 ---
 
-# 19. Duplicate Handling
+# 14. Coding Rules for AI Agent
 
-Jika PDF yang sama di-upload ulang pada eksperimen ini:
-
-Pilihan sederhana diperbolehkan:
-
-```text
-buat document_id baru
-```
-
-Tidak perlu deduplication kompleks.
-
-Namun Chroma record ID harus selalu unik.
+1. Jangan overengineer — tetap port 1:1 logic dari versi Python kecuali memang perlu berubah karena keterbatasan serverless.
+2. Pisahkan module berdasarkan responsibility, sama seperti struktur `backend/` di v0.1.
+3. Gunakan TypeScript strict mode dan Zod untuk validasi request/response (pengganti Pydantic).
+4. Jangan commit `.env`.
+5. Jangan expose stack trace ke API response.
+6. Fail jelas kalau Gemini API key tidak valid atau Neon tidak bisa diakses — jangan silent fail.
+7. Jangan menambahkan dependency besar (LangChain, LlamaIndex) tanpa kebutuhan jelas.
+8. Jalankan test setelah setiap phase besar, sama seperti v0.1 §38.20.
 
 ---
 
-# 20. FR-03 — Semantic Search
+# 15. Definition of Done (v0.2)
 
-Endpoint:
-
-```http
-POST /search
-```
-
-Request:
-
-```json
-{
-  "document_id": "uuid",
-  "query": "sistem pernapasan manusia",
-  "top_k": 5
-}
-```
-
-Flow:
-
-```text
-query
-↓
-embedding
-↓
-Chroma similarity search
-↓
-filter document_id
-↓
-top K
-```
-
-Response:
-
-```json
-{
-  "query": "sistem pernapasan manusia",
-  "results": [
-    {
-      "content": "...",
-      "page": 12,
-      "chunk_index": 2,
-      "distance": 0.12
-    }
-  ]
-}
-```
-
-Search wajib terfilter berdasarkan `document_id`.
-
-Tidak boleh mengambil context dari PDF lain.
+- [ ] Next.js project berjalan lokal (`next dev`) dan di Vercel.
+- [ ] Upload PDF berhasil diproses tanpa menyimpan file ke disk server.
+- [ ] Chunking menghasilkan metadata halaman yang benar.
+- [ ] Embedding berhasil dibuat via Gemini API.
+- [ ] Chunk + embedding tersimpan di Neon pgvector.
+- [ ] Semantic search terfilter per `document_id`.
+- [ ] `/api/generate` menggunakan retrieved chunks (bukan seluruh PDF).
+- [ ] Output soal sesuai schema v0.1 (options, answer, explanation, source page).
+- [ ] Deploy ke Vercel berhasil dan bisa diakses publik.
+- [ ] Environment variable terkonfigurasi di Vercel dashboard (tidak hardcode kredensial).
+- [ ] README diperbarui dengan instruksi setup Next.js + Neon + Gemini dari nol.
 
 ---
 
-# 21. FR-04 — Generate Questions
+# 16. Next Phase After v0.2
 
-Endpoint:
-
-```http
-POST /generate
-```
-
-Request:
-
-```json
-{
-  "document_id": "uuid",
-  "topic": "sistem pernapasan manusia",
-  "question_count": 5,
-  "difficulty": "medium",
-  "type": "multiple_choice"
-}
-```
-
-Allowed difficulty:
+Jangan implementasikan sekarang. Kandidat tahap berikutnya setelah v0.2 stabil:
 
 ```text
-easy
-medium
-hard
-```
-
-Allowed type pada v0.1:
-
-```text
-multiple_choice
-```
-
----
-
-# 22. Retrieval Before Generation
-
-Generator tidak boleh langsung menggunakan seluruh PDF.
-
-Flow wajib:
-
-```text
-topic
-↓
-embedding
-↓
-Chroma
-↓
-top 5 relevant chunks
-↓
-build context
-↓
-LLM
-```
-
-Default:
-
-```text
-top_k = 5
-```
-
----
-
-# 23. Prompt Requirement
-
-Prompt harus menginstruksikan LLM:
-
-1. Gunakan hanya informasi dari context.
-2. Jangan membuat fakta yang tidak ada pada context.
-3. Buat jumlah soal sesuai request.
-4. Berikan empat pilihan jawaban.
-5. Hanya satu jawaban benar.
-6. Berikan penjelasan.
-7. Gunakan bahasa materi/user.
-8. Return JSON.
-9. Jangan menambahkan Markdown.
-10. Jangan menggunakan knowledge eksternal jika tidak terdapat dalam materi.
-
-Contoh instruksi inti:
-
-```text
-You are an educational question generator.
-
-Use ONLY the supplied source material.
-
-Do not introduce facts that are not supported by the source.
-
-Generate the requested number of questions.
-
-Return valid JSON only.
-```
-
----
-
-# 24. Question Output Schema
-
-Response harus normalized menjadi:
-
-```json
-{
-  "document_id": "uuid",
-  "topic": "sistem pernapasan manusia",
-  "difficulty": "medium",
-  "questions": [
-    {
-      "question": "Apa fungsi utama alveolus?",
-      "options": [
-        "Memompa darah",
-        "Tempat pertukaran gas",
-        "Menghasilkan enzim",
-        "Menyaring darah"
-      ],
-      "answer": "Tempat pertukaran gas",
-      "explanation": "Alveolus menjadi lokasi pertukaran oksigen dan karbon dioksida.",
-      "sources": [
-        {
-          "page": 12
-        }
-      ]
-    }
-  ]
-}
-```
-
----
-
-# 25. Source Attribution
-
-Setiap batch pertanyaan harus menyimpan informasi source context.
-
-Minimal:
-
-```text
-page
-```
-
-Lebih baik:
-
-```json
-{
-  "page": 12,
-  "chunk_index": 3
-}
-```
-
-Untuk eksperimen, source tidak harus akurat sampai level kalimat.
-
-Tetapi halaman sumber harus berasal dari retrieved chunks.
-
-LLM tidak boleh mengarang nomor halaman.
-
-Nomor halaman sebaiknya di-attach oleh backend berdasarkan retrieved context.
-
----
-
-# 26. Structured Output Handling
-
-LLM kadang menghasilkan:
-
-````text
-```json
-...
-````
-
-````
-
-atau tambahan text.
-
-Backend harus mempunyai mekanisme robust untuk:
-
-- membersihkan markdown fence;
-- parse JSON;
-- mendeteksi invalid JSON.
-
-Jika parsing gagal:
-
-- lakukan maksimal satu retry dengan prompt koreksi;
-- jika tetap gagal, return controlled error.
-
-Jangan melakukan infinite retry.
-
----
-
-# 27. FR-05 — Delete Document
-
-Optional tetapi disarankan.
-
-Endpoint:
-
-```http
-DELETE /documents/{document_id}
-````
-
-Harus menghapus vector/chunk terkait document tersebut dari ChromaDB.
-
-File lokal juga boleh dihapus.
-
-Response:
-
-```json
-{
-  "document_id": "...",
-  "status": "deleted"
-}
-```
-
----
-
-# 28. API Summary
-
-Minimal endpoint:
-
-```text
-GET    /health
-
-POST   /documents
-
-POST   /search
-
-POST   /generate
-```
-
-Recommended:
-
-```text
-DELETE /documents/{document_id}
-```
-
-Swagger tersedia melalui:
-
-```text
-/docs
-```
-
----
-
-# 29. Error Handling
-
-Backend harus memiliki error yang jelas.
-
-Contoh:
-
-### Ollama unavailable
-
-```json
-{
-  "detail": "Ollama service is unavailable."
-}
-```
-
-### Model unavailable
-
-```json
-{
-  "detail": "Required Ollama model is not installed."
-}
-```
-
-### Invalid document
-
-```json
-{
-  "detail": "Document not found."
-}
-```
-
-### No relevant context
-
-```json
-{
-  "detail": "No relevant source material found for this topic."
-}
-```
-
-### LLM invalid output
-
-```json
-{
-  "detail": "LLM returned invalid structured output."
-}
-```
-
-Jangan expose stack trace ke API response.
-
----
-
-# 30. Logging
-
-Gunakan logging sederhana.
-
-Log minimal:
-
-```text
-PDF uploaded
-PDF parsed
-Number of pages
-Number of chunks
-Embedding started
-Embedding completed
-Chroma insert completed
-Retrieval query
-Retrieved chunk count
-LLM generation started
-LLM generation completed
-Parsing error
-```
-
-Jangan mencetak seluruh isi PDF ke log.
-
----
-
-# 31. Performance Requirement
-
-Karena environment terbatas:
-
-- proses embedding sequential diperbolehkan;
-- batching boleh dilakukan jika sederhana;
-- tidak perlu parallel worker;
-- tidak perlu async queue;
-- jangan load model secara manual ke Python memory;
-- seluruh inference melalui Ollama.
-
-Sistem tidak wajib cepat.
-
-Yang penting stabil dan berhasil.
-
----
-
-# 32. Security Scope
-
-Eksperimen hanya localhost.
-
-Tetap implementasikan:
-
-- validasi MIME/file extension;
-- batas ukuran PDF.
-
-Default:
-
-```text
-max PDF:
-25 MB
-```
-
-Tidak perlu authentication.
-
-Tidak perlu rate limiting.
-
----
-
-# 33. Testing Requirements
-
-Gunakan `pytest`.
-
-Minimal test:
-
-## PDF parser
-
-```text
-valid PDF → pass
-empty PDF → controlled error
-```
-
-## Chunker
-
-```text
-small text
-large text
-overlap
-page metadata preserved
-```
-
-## Vector Store
-
-```text
-insert
-query
-filter document_id
-delete
-```
-
-## API
-
-```text
-GET /health
-
-invalid PDF upload
-
-generate with unknown document
-```
-
-Ollama integration test boleh dipisahkan agar tidak selalu berjalan pada unit test.
-
----
-
-# 34. Manual Acceptance Test
-
-Agent harus memastikan flow berikut bekerja.
-
-## Test Case 1 — Index PDF
-
-Given:
-
-```text
-materi IPA.pdf
-```
-
-When:
-
-```text
-POST /documents
-```
-
-Expected:
-
-```text
-HTTP 200
-document_id returned
-pages > 0
-chunks > 0
-```
-
----
-
-## Test Case 2 — Search
-
-Given:
-
-```text
-document already indexed
-```
-
-When:
-
-```text
-query:
-"sistem pernapasan"
-```
-
-Expected:
-
-```text
-3–5 relevant chunks returned
-page metadata available
-```
-
----
-
-## Test Case 3 — Generate
-
-When:
-
-```json
-{
-  "topic": "sistem pernapasan",
-  "question_count": 5,
-  "difficulty": "medium"
-}
-```
-
-Expected:
-
-```text
-exactly 5 questions
-
-each question:
-4 options
-1 answer
-explanation
-source page
-```
-
----
-
-# 35. Definition of Done
-
-Eksperimen dianggap selesai jika semua kondisi berikut terpenuhi.
-
-- [ ] Ollama dapat terhubung dari backend.
-- [ ] `nomic-embed-text` dapat menghasilkan embedding.
-- [ ] Qwen dapat menghasilkan response.
-- [ ] PDF dapat di-upload.
-- [ ] PDF dapat di-extract.
-- [ ] Text berhasil di-chunk.
-- [ ] Metadata page tidak hilang.
-- [ ] Chunks tersimpan di ChromaDB.
-- [ ] Chroma persistent setelah backend restart.
-- [ ] Semantic search bekerja.
-- [ ] Search dapat difilter berdasarkan document ID.
-- [ ] `/generate` menggunakan retrieved chunks.
-- [ ] Sistem menghasilkan soal pilihan ganda.
-- [ ] Output berupa valid JSON.
-- [ ] Jumlah soal sesuai parameter.
-- [ ] Setiap soal memiliki 4 options.
-- [ ] Setiap soal memiliki answer.
-- [ ] Setiap soal memiliki explanation.
-- [ ] Source page tersedia.
-- [ ] Swagger API berjalan.
-- [ ] Basic automated tests pass.
-- [ ] README berisi instruksi setup dari nol.
-
----
-
-# 36. README Requirement
-
-README harus mempunyai langkah berikut.
-
-## Requirements
-
-```text
-Python
-Ollama
-```
-
-## Setup
-
-```bash
-python -m venv .venv
-```
-
-Windows:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Install:
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-Model:
-
-```bash
-ollama pull nomic-embed-text
-ollama pull qwen3:4b
-```
-
-Run:
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-Test:
-
-```text
-http://localhost:8000/docs
-```
-
----
-
-# 37. Development Sequence
-
-AI agent harus mengimplementasikan berdasarkan urutan berikut.
-
-## Phase 1 — Foundation
-
-Implement:
-
-```text
-config
-FastAPI
-health
-Ollama client
-```
-
-Verify Ollama.
-
----
-
-## Phase 2 — PDF Processing
-
-Implement:
-
-```text
-PDF upload
-PyMuPDF extraction
-page metadata
-chunking
-```
-
-Test sebelum lanjut.
-
----
-
-## Phase 3 — Embedding
-
-Implement:
-
-```text
-nomic embedding
-```
-
-Pastikan vector berhasil dibuat.
-
----
-
-## Phase 4 — ChromaDB
-
-Implement:
-
-```text
-persistent collection
-insert
-search
-filter
-delete
-```
-
-Test retrieval secara terpisah.
-
----
-
-## Phase 5 — RAG
-
-Implement:
-
-```text
-topic
-↓
-embedding
-↓
-retrieval
-↓
-context
-```
-
-Verifikasi retrieved text relevan sebelum menghubungkan ke LLM.
-
----
-
-## Phase 6 — Question Generation
-
-Implement:
-
-```text
-prompt
-Qwen
-structured JSON
-validation
-```
-
----
-
-## Phase 7 — API Integration
-
-Expose:
-
-```text
-/documents
-/search
-/generate
-```
-
----
-
-## Phase 8 — Tests and Documentation
-
-Implement:
-
-```text
-pytest
-README
-.env.example
-manual verification
-```
-
----
-
-# 38. Coding Rules for AI Agent
-
-Agent harus mengikuti aturan berikut.
-
-1. Jangan overengineer.
-2. Jangan membuat frontend.
-3. Jangan menambahkan database selain ChromaDB.
-4. Jangan menggunakan LangChain pada versi pertama.
-5. Jangan menggunakan LlamaIndex.
-6. Jangan menggunakan API AI eksternal.
-7. Gunakan direct Ollama API.
-8. Pisahkan module berdasarkan responsibility.
-9. Jangan membuat satu file Python besar.
-10. Gunakan type hints.
-11. Gunakan Pydantic schema untuk API request/response.
-12. Gunakan environment variables.
-13. Jangan commit `.env`.
-14. Jangan commit PDF hasil upload.
-15. Jangan commit isi `chroma_data`.
-16. Tambahkan semua runtime artifacts ke `.gitignore`.
-17. Jangan menambahkan dependency tanpa kebutuhan.
-18. Fail clearly jika Ollama mati.
-19. Fail clearly jika model belum terinstall.
-20. Jalankan test setelah setiap phase besar.
-
----
-
-# 39. Dependencies
-
-Target `requirements.txt` tetap minimal.
-
-Contoh:
-
-```text
-fastapi
-uvicorn[standard]
-python-multipart
-PyMuPDF
-chromadb
-requests
-python-dotenv
-pydantic
-pytest
-httpx
-```
-
-Agent boleh menyesuaikan versi package dan dependency transitive jika diperlukan.
-
----
-
-# 40. Explicit Non-Goals for AI Agent
-
-AI agent DILARANG secara otomatis:
-
-```text
-membuat Next.js
-membuat Supabase
-membuat pgvector
-membuat login
-membuat Docker deployment
-membuat cloud deployment
-menambahkan LangChain
-menambahkan Redis
-menambahkan Celery
-menambahkan authentication
-menambahkan payment
-```
-
-kecuali diminta pada batch lanjutan.
-
----
-
-# 41. Expected Experiment Result
-
-Setelah project berjalan, tester harus bisa:
-
-### Step 1
-
-Run:
-
-```bash
-ollama serve
-```
-
-### Step 2
-
-Run:
-
-```bash
-uvicorn backend.main:app --reload
-```
-
-### Step 3
-
-Buka:
-
-```text
-http://localhost:8000/docs
-```
-
-### Step 4
-
-Upload:
-
-```text
-materi-ipa.pdf
-```
-
-### Step 5
-
-Receive:
-
-```json
-{
-  "document_id": "...",
-  "pages": 30,
-  "chunks": 80
-}
-```
-
-### Step 6
-
-Call:
-
-```http
-POST /generate
-```
-
-dengan:
-
-```json
-{
-  "document_id": "...",
-  "topic": "sistem pernapasan",
-  "question_count": 5,
-  "difficulty": "medium",
-  "type": "multiple_choice"
-}
-```
-
-### Step 7
-
-Receive:
-
-```json
-{
-  "questions": [
-    {
-      "question": "...",
-      "options": [
-        "...",
-        "...",
-        "...",
-        "..."
-      ],
-      "answer": "...",
-      "explanation": "...",
-      "sources": [
-        {
-          "page": 10
-        }
-      ]
-    }
-  ]
-}
-```
-
-Jika flow tersebut berhasil secara konsisten, eksperimen v0.1 dinyatakan berhasil.
-
----
-
-# 42. Next Phase After Experiment
-
-Jangan implementasikan sekarang.
-
-Jika eksperimen berhasil, kemungkinan tahap berikut:
-
-```text
-v0.2
-Frontend Next.js
-
 v0.3
-Question review/edit
+Streaming response saat generate soal
 
 v0.4
-Multiple question types
+Authentication (NextAuth) untuk multi-user
 
 v0.5
-Supabase authentication
+Question review/edit UI
 
 v0.6
-ChromaDB → pgvector migration
+Rate limiting & usage quota per user
 
 v0.7
-Teacher/student workflow
-
-v0.8
-Deployment
+Dukungan tipe soal selain pilihan ganda
 ```
 
-Keputusan tahap berikut hanya dilakukan setelah kualitas retrieval dan question generation pada v0.1 tervalidasi.
+Keputusan tahap berikutnya hanya dilakukan setelah v0.2 tervalidasi berjalan stabil di production (Vercel + Neon + Gemini).

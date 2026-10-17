@@ -1,61 +1,57 @@
-# PDF Question Generator Experiment
+# PDF Question Generator
 
-Local FastAPI experiment that extracts text from a PDF, embeds page-aware chunks with Ollama, stores them in persistent ChromaDB, and generates grounded multiple-choice questions with Qwen. No cloud AI account is needed.
+Next.js app that extracts text from a PDF, embeds page-aware chunks with the Google Gemini API, stores them in Postgres (`pgvector`) on Neon, and generates grounded multiple-choice questions. Deployable for free on Vercel — no local LLM or GPU required.
 
 ## Requirements
 
-- Python 3.11 or newer
-- Ollama running locally
+- Node.js 20+
+- A [Google AI Studio](https://aistudio.google.com/) API key (Gemini)
+- A [Neon](https://neon.tech) Postgres project with the `vector` extension
 
-## Setup on Windows
+## Setup
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r backend/requirements.txt
-Copy-Item .env.example .env
-ollama pull nomic-embed-text
-ollama pull qwen3:4b
-ollama serve
+```bash
+npm install
+cp .env.example .env.local
 ```
 
-If PowerShell blocks `Activate.ps1` because script execution is disabled, allow scripts only for the current terminal session, then activate again:
+Fill in `.env.local`:
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
+```env
+GEMINI_API_KEY=...
+DATABASE_URL=postgresql://...neon.tech/...?sslmode=require
 ```
 
-Alternatively, skip activation and call the virtual environment executables directly:
+Apply the database schema (creates the `vector` extension, `documents` and `chunks` tables):
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+```bash
+npm run db:migrate
 ```
 
-If Ollama already runs in the background, skip `ollama serve`. For a smaller CPU model, set `OLLAMA_LLM_MODEL=qwen3:1.7b` in `.env` and pull that model.
+Run the dev server:
 
-In another terminal, activate the same environment and run:
-
-```powershell
-uvicorn backend.main:app --reload
+```bash
+npm run dev
 ```
 
-Without activating the environment, use `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload` instead.
+Open [http://localhost:3000](http://localhost:3000). Upload a text-based PDF, then generate multiple-choice questions grounded in its content with page references. Detected lesson/unit/bab/chapter headings appear as generation scopes; mentioning one in the topic (e.g. "soal untuk bab 3") keeps retrieval inside that section. `MAX_RETRIEVAL_DISTANCE` in `.env.local` controls how strict semantic relevance filtering is. Scanned image PDFs need OCR and are rejected.
 
-The Streamlit interface is available at `http://localhost:8501`. Start it in another terminal after the API is running:
+## Testing
 
-```powershell
-.\.venv\Scripts\streamlit.exe run frontend/app.py
+```bash
+npm test
 ```
 
-Without activating the environment, the same command works; Streamlit displays a local URL, normally `http://localhost:8501`.
+Covers chunking (page metadata, word-boundary splitting with overlap, section detection). API routes are exercised manually against a real Gemini key and Neon database; there is no mocked integration suite yet.
 
-The interface lets you upload a text-based PDF, search its contents, and generate multiple-choice questions with page references. Detected lesson/unit headings appear as generation scopes; selecting one keeps retrieval inside that section. Re-upload documents indexed before section detection was added. `MAX_RETRIEVAL_DISTANCE` controls how strict semantic relevance filtering is (lower values reject more weak matches). Swagger UI remains available at [http://localhost:8000/docs](http://localhost:8000/docs). Scanned image PDFs need OCR and are rejected in this version.
+## Deployment
 
-Example generation request:
-
-```json
-{"document_id":"returned-uuid","topic":"sistem pernapasan","question_count":5,"difficulty":"medium","type":"multiple_choice"}
+```bash
+npx vercel
 ```
 
-Run tests from the activated environment with `python -m pytest -q`. The tests use an isolated temporary Chroma store and a fake generator; they do not require Ollama. They cover PDF validation, the upload → search → generate → delete flow, source references, model failures, and invalid model output. For a live acceptance check, upload a real PDF, search a topic, generate questions, and verify the returned page references against the PDF. Uploaded files and persistent vectors are kept in `uploads/` and `chroma_data/` and ignored by Git.
+Set `GEMINI_API_KEY` and `DATABASE_URL` (plus any non-default `GEMINI_MODEL`/`GEMINI_EMBED_MODEL`) in the Vercel project's Environment Variables, matching `.env.example`.
+
+## Architecture
+
+See `PRD — PDF Question Generator Experiment.md` for the full spec. In short: PDF upload → `pdf-parse` extraction → chunking with page/section metadata → Gemini embeddings → `pgvector` storage → semantic search scoped to the document (and section, if requested) → Gemini generates structured JSON questions validated against the retrieved context.
