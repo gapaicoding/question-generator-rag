@@ -11,17 +11,22 @@ import type { Chunk } from "@/lib/schemas";
 export const maxDuration = 60;
 
 export async function GET() {
-  const documents = await listDocuments();
-  return NextResponse.json({
-    documents: documents.map((d) => ({
-      document_id: d.documentId,
-      filename: d.filename,
-      pages: d.pages,
-      chunks: d.chunks,
-      sections: d.sections,
-      created_at: d.createdAt,
-    })),
-  });
+  try {
+    const documents = await listDocuments();
+    return NextResponse.json({
+      documents: documents.map((d) => ({
+        document_id: d.documentId,
+        filename: d.filename,
+        pages: d.pages,
+        chunks: d.chunks,
+        sections: d.sections,
+        created_at: d.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("Failed to list documents:", err);
+    return NextResponse.json({ detail: "Failed to load documents." }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
