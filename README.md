@@ -12,11 +12,24 @@ Local FastAPI experiment that extracts text from a PDF, embeds page-aware chunks
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
+python -m pip install -r backend/requirements.txt
 Copy-Item .env.example .env
 ollama pull nomic-embed-text
 ollama pull qwen3:4b
 ollama serve
+```
+
+If PowerShell blocks `Activate.ps1` because script execution is disabled, allow scripts only for the current terminal session, then activate again:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Alternatively, skip activation and call the virtual environment executables directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.txt
 ```
 
 If Ollama already runs in the background, skip `ollama serve`. For a smaller CPU model, set `OLLAMA_LLM_MODEL=qwen3:1.7b` in `.env` and pull that model.
@@ -27,7 +40,17 @@ In another terminal, activate the same environment and run:
 uvicorn backend.main:app --reload
 ```
 
-Open [Swagger UI](http://localhost:8000/docs). Upload a text-based PDF through `POST /documents`, then use its `document_id` in `POST /search` and `POST /generate`. Scanned image PDFs need OCR and are rejected in this version.
+Without activating the environment, use `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload` instead.
+
+The Streamlit interface is available at `http://localhost:8501`. Start it in another terminal after the API is running:
+
+```powershell
+.\.venv\Scripts\streamlit.exe run frontend/app.py
+```
+
+Without activating the environment, the same command works; Streamlit displays a local URL, normally `http://localhost:8501`.
+
+The interface lets you upload a text-based PDF, search its contents, and generate multiple-choice questions with page references. Swagger UI remains available at [http://localhost:8000/docs](http://localhost:8000/docs). Scanned image PDFs need OCR and are rejected in this version.
 
 Example generation request:
 
@@ -35,4 +58,4 @@ Example generation request:
 {"document_id":"returned-uuid","topic":"sistem pernapasan","question_count":5,"difficulty":"medium","type":"multiple_choice"}
 ```
 
-Run tests with `pytest -q`. The tests use a temporary Chroma store and a fake generator; they do not require Ollama. For a live acceptance check, upload a real PDF in Swagger, search a topic, generate five questions, and verify the returned page references against the PDF. Uploaded files and persistent vectors are kept in `uploads/` and `chroma_data/` and ignored by Git.
+Run tests from the activated environment with `python -m pytest -q`. The tests use an isolated temporary Chroma store and a fake generator; they do not require Ollama. They cover PDF validation, the upload → search → generate → delete flow, source references, model failures, and invalid model output. For a live acceptance check, upload a real PDF, search a topic, generate questions, and verify the returned page references against the PDF. Uploaded files and persistent vectors are kept in `uploads/` and `chroma_data/` and ignored by Git.
