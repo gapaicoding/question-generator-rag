@@ -200,7 +200,7 @@ with quiz_tab:
     )
     difficulty_label = st.selectbox("Kesulitan", ["Mudah", "Menengah", "Sulit"])
     difficulty = {"Mudah": "easy", "Menengah": "medium", "Sulit": "hard"}[difficulty_label]
-    question_count = st.select_slider("Jumlah soal", options=[1, 2, 3, 5, 7, 10], value=5)
+    question_count = st.number_input("Jumlah soal", min_value=1, max_value=20, value=5, step=1)
     if st.button("Buat soal", type="primary", disabled=not document, key="generate_button"):
         if not prompt.strip():
             st.warning("Tulis prompt atau fokus materi soal terlebih dahulu.")

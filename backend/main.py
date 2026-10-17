@@ -151,11 +151,17 @@ def generate(request: GenerateRequest):
         if scope and not chunks:
             raise HTTPException(status_code=422, detail="Requested section has no searchable content in the indexed document.")
         max_distance = getattr(settings, "max_retrieval_distance", 1.2)
-        chunks = [chunk for chunk in chunks if chunk.get("distance", 0) <= max_distance]
+        filtered_chunks = [chunk for chunk in chunks if chunk.get("distance", 0) <= max_distance]
+        minimum_chars = min(320, 32 * request.question_count)
+        context_chars = sum(len(chunk["content"]) for chunk in filtered_chunks)
+        if not scope and context_chars < minimum_chars:
+            logger.info("Relevant context too thin for whole-document scope; widening retrieval")
+            chunks = db.search(request.document_id, vector, settings.top_k * 4)
+            filtered_chunks = chunks
+            context_chars = sum(len(chunk["content"]) for chunk in filtered_chunks)
+        chunks = filtered_chunks
         if not chunks:
             raise HTTPException(status_code=422, detail="No relevant source material found for this topic.")
-        context_chars = sum(len(chunk["content"]) for chunk in chunks)
-        minimum_chars = min(320, 32 * request.question_count)
         if context_chars < minimum_chars:
             raise HTTPException(status_code=422, detail="Retrieved source material is too short to create the requested number of grounded questions.")
         generation_started = time.perf_counter()

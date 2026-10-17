@@ -35,7 +35,7 @@ class GenerateRequest(BaseModel):
     document_id: str
     topic: str = Field(min_length=1, max_length=500)
     scope: str | None = Field(default=None, max_length=100)
-    question_count: int = Field(default=5, ge=1, le=10)
+    question_count: int = Field(default=5, ge=1, le=20)
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     type: Literal["multiple_choice"] = "multiple_choice"
 
