@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-multipart
+PyMuPDF
+chromadb
+requests
+python-dotenv
+pytest
+httpx
