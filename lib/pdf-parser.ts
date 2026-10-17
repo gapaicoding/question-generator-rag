@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 
 export class InvalidPDF extends Error {}
 
@@ -13,19 +13,16 @@ export async function extractPages(data: Buffer): Promise<PageText[]> {
   }
 
   let result;
-  const parser = new PDFParse({ data });
   try {
-    result = await parser.getText();
-  } catch (err) {
-    console.error("pdf-parse getText failed:", err);
+    const doc = await getDocumentProxy(new Uint8Array(data));
+    result = await extractText(doc, { mergePages: false });
+  } catch {
     throw new InvalidPDF("PDF is corrupted or invalid.");
-  } finally {
-    await parser.destroy();
   }
 
-  const pages: PageText[] = result.pages.map((p) => ({
-    page: p.num,
-    text: (p.text ?? "").trim(),
+  const pages: PageText[] = result.text.map((text, i) => ({
+    page: i + 1,
+    text: (text ?? "").trim(),
   }));
 
   if (!pages.some((p) => p.text)) {
