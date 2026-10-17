@@ -8,6 +8,7 @@ class DocumentResponse(BaseModel):
     filename: str
     pages: int
     chunks: int
+    sections: list[str] = Field(default_factory=list)
     status: Literal["indexed"] = "indexed"
 
 
@@ -22,6 +23,7 @@ class SearchResult(BaseModel):
     page: int
     chunk_index: int
     distance: float
+    section: str = ""
 
 
 class SearchResponse(BaseModel):
@@ -31,7 +33,8 @@ class SearchResponse(BaseModel):
 
 class GenerateRequest(BaseModel):
     document_id: str
-    topic: str = Field(min_length=1)
+    topic: str = Field(min_length=1, max_length=500)
+    scope: str | None = Field(default=None, max_length=100)
     question_count: int = Field(default=5, ge=1, le=10)
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     type: Literal["multiple_choice"] = "multiple_choice"

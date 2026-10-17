@@ -45,7 +45,11 @@ def api_error_message(error, action):
         if detail == "Document not found.":
             return "Indeks dokumen tidak ditemukan. Unggah ulang PDF untuk melanjutkan."
         if detail == "No relevant source material found for this topic.":
-            return "Materi yang cocok belum ditemukan. Coba topik yang lebih umum atau gunakan kata dari dokumen."
+            return "Materi yang cocok belum ditemukan. Coba prompt yang lebih spesifik pada isi PDF atau gunakan istilah dari dokumen."
+        if isinstance(detail, str) and detail.startswith("Requested section was not found"):
+            return "Bagian yang diminta tidak ditemukan di indeks PDF. Unggah ulang dokumen terbaru atau pilih cakupan lain yang terdeteksi."
+        if isinstance(detail, str) and detail.startswith("Retrieved source material is too short"):
+            return "Bukti dari PDF terlalu sedikit untuk jumlah soal tersebut. Pilih bagian yang lebih luas atau kurangi jumlah soal."
         if detail == "LLM returned invalid structured output.":
             return "Model belum menghasilkan format soal yang valid setelah dicoba ulang. Coba sekali lagi atau pilih jumlah soal yang lebih sedikit."
         if isinstance(detail, str) and "timed out" in detail.lower():
@@ -125,6 +129,10 @@ if st.button("Unggah dan proses PDF", type="primary", disabled=uploaded_file is 
 document = st.session_state.document
 if document:
     st.info(f"**{document['filename']}** · {document['pages']} halaman · {document['chunks']} bagian terindeks")
+    if document.get("sections"):
+        st.caption("Bagian yang terdeteksi saat indeks: " + ", ".join(document["sections"]))
+    else:
+        st.caption("Tidak ada heading bagian yang dikenali. Pencarian soal memakai seluruh dokumen; tulis fokus materi pada prompt, bukan nomor lesson.")
     if st.button("Hapus dokumen aktif"):
         deleted = request_with_status(
             "Penghapusan dokumen",
@@ -173,28 +181,45 @@ with search_tab:
 
 with quiz_tab:
     st.header("Buat soal latihan")
-    topic = st.text_input("Topik", placeholder="Contoh: sistem pernapasan", key="quiz_topic")
+    sections = document.get("sections", []) if document else []
+    section_options = ["Seluruh dokumen", *sections]
+    section_key = f"quiz_scope_{document['document_id']}" if document else "quiz_scope_none"
+    selected_section = st.selectbox(
+        "Cakupan materi",
+        section_options,
+        key=section_key,
+        help="Pilih lesson atau bagian agar pencarian dan soal tidak mengambil materi dari bagian lain.",
+        disabled=not document,
+    )
+    prompt = st.text_area(
+        "Prompt kamu apa?",
+        placeholder="Contoh: Fokus pada greeting, menanyakan nama, asal kota, dan umur.",
+        help="Tulis fokus atau arahan soal. Nomor lesson hanya dapat dipakai jika heading-nya terdeteksi di PDF. Jawaban tetap harus didukung PDF.",
+        max_chars=500,
+        key="quiz_prompt",
+    )
     difficulty_label = st.selectbox("Kesulitan", ["Mudah", "Menengah", "Sulit"])
     difficulty = {"Mudah": "easy", "Menengah": "medium", "Sulit": "hard"}[difficulty_label]
     question_count = st.select_slider("Jumlah soal", options=[1, 2, 3, 5, 7, 10], value=5)
     if st.button("Buat soal", type="primary", disabled=not document, key="generate_button"):
-        if not topic.strip():
-            st.warning("Isi topik soal terlebih dahulu.")
+        if not prompt.strip():
+            st.warning("Tulis prompt atau fokus materi soal terlebih dahulu.")
         else:
             data = request_with_status(
                 "Pembuatan soal",
                 "Mencari sumber dan menyusun soal…",
                 [
-                    "Mencari bagian dokumen yang sesuai dengan topik.",
+                    f"Mencari bagian yang relevan di {selected_section.lower()}.",
                     f"Menyusun {question_count} soal tingkat {difficulty_label.lower()} menggunakan Ollama.",
-                    "Memeriksa jumlah soal, pilihan jawaban, dan referensi halaman.",
+                    "Memastikan konteks cukup, memeriksa pilihan jawaban, dan melampirkan referensi halaman.",
                 ],
                 "POST",
                 "/generate",
                 "Soal selesai dibuat dan sumber sudah dilampirkan",
                 json={
                     "document_id": document["document_id"],
-                    "topic": topic.strip(),
+                    "topic": prompt.strip(),
+                    "scope": selected_section if selected_section != "Seluruh dokumen" else None,
                     "question_count": question_count,
                     "difficulty": difficulty,
                     "type": "multiple_choice",

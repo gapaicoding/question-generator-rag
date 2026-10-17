@@ -17,6 +17,7 @@ class Settings:
     chunk_size: int = int(os.getenv("DEFAULT_CHUNK_SIZE", "1200"))
     chunk_overlap: int = int(os.getenv("DEFAULT_CHUNK_OVERLAP", "200"))
     top_k: int = int(os.getenv("DEFAULT_TOP_K", "5"))
+    max_retrieval_distance: float = float(os.getenv("MAX_RETRIEVAL_DISTANCE", "1.2"))
     ollama_timeout_seconds: int = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "300"))
     max_pdf_bytes: int = 25 * 1024 * 1024
 

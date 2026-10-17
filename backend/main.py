@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -31,6 +32,15 @@ def require_document(db: VectorStore, document_id: str) -> None:
         raise HTTPException(status_code=404, detail="Document not found.")
 
 
+def requested_section(prompt: str) -> str | None:
+    match = re.search(r"\b(lesson|unit|bab|chapter|pelajaran)\s+(\d+|[ivxlcdm]+)\b", prompt, re.IGNORECASE)
+    if not match:
+        return None
+    number = match.group(2)
+    normalized = str(int(number)) if number.isdigit() else number.upper()
+    return f"{match.group(1).title()} {normalized}"
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "ollama": ollama().available()}
@@ -54,6 +64,7 @@ def upload_document(file: UploadFile = File(...)):
     logger.info("PDF parsed; pages=%d", len(pages))
     document_id = str(uuid4())
     chunks = chunk_pages(pages, document_id, filename, settings.chunk_size, settings.chunk_overlap)
+    sections = list(dict.fromkeys(chunk["section"] for chunk in chunks if chunk.get("section")))
     logger.info("Number of chunks: %d; embedding started", len(chunks))
     try:
         client = ollama()
@@ -75,7 +86,7 @@ def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Document indexing failed.")
     settings.upload_path.mkdir(parents=True, exist_ok=True)
     (settings.upload_path / f"{document_id}.pdf").write_bytes(data)
-    return DocumentResponse(document_id=document_id, filename=filename, pages=len(pages), chunks=len(chunks))
+    return DocumentResponse(document_id=document_id, filename=filename, pages=len(pages), chunks=len(chunks), sections=sections)
 
 
 @app.post("/search", response_model=SearchResponse)
@@ -98,19 +109,41 @@ def generate(request: GenerateRequest):
     db = store()
     require_document(db, request.document_id)
     try:
+        requested_scope = request.scope or requested_section(request.topic)
+        scope = None
+        if requested_scope:
+            indexed_sections = db.list_sections(request.document_id)
+            if indexed_sections:
+                scope = next((section for section in indexed_sections if section.casefold() == requested_scope.casefold()), None)
+                if not scope:
+                    raise HTTPException(status_code=422, detail="Requested section was not found in the indexed document. Re-upload the PDF to refresh section indexing.")
+            else:
+                logger.info("No document sections detected; falling back to full-document semantic retrieval")
         embedding_started = time.perf_counter()
         logger.info("Query embedding started")
-        vector = ollama().embed([request.topic])[0]
+        retrieval_query = f"{scope or ''} {request.topic}".strip()
+        vector = ollama().embed([retrieval_query])[0]
         logger.info("Query embedding completed in %.2f seconds", time.perf_counter() - embedding_started)
         retrieval_started = time.perf_counter()
-        chunks = db.search(request.document_id, vector, settings.top_k)
+        if scope:
+            chunks = db.search(request.document_id, vector, settings.top_k, section=scope)
+        else:
+            chunks = db.search(request.document_id, vector, settings.top_k)
         logger.info("Retrieval completed in %.2f seconds", time.perf_counter() - retrieval_started)
         logger.info("Retrieved chunk count: %d", len(chunks))
+        if scope and not chunks:
+            raise HTTPException(status_code=422, detail="Requested section has no searchable content in the indexed document.")
+        max_distance = getattr(settings, "max_retrieval_distance", 1.2)
+        chunks = [chunk for chunk in chunks if chunk.get("distance", 0) <= max_distance]
         if not chunks:
             raise HTTPException(status_code=422, detail="No relevant source material found for this topic.")
+        context_chars = sum(len(chunk["content"]) for chunk in chunks)
+        minimum_chars = min(320, 32 * request.question_count)
+        if context_chars < minimum_chars:
+            raise HTTPException(status_code=422, detail="Retrieved source material is too short to create the requested number of grounded questions.")
         generation_started = time.perf_counter()
         logger.info("LLM generation started")
-        questions = generate_questions(ollama(), request.topic, request.difficulty, request.question_count, chunks)
+        questions = generate_questions(ollama(), request.topic, request.difficulty, request.question_count, chunks, scope)
         logger.info("LLM generation completed in %.2f seconds", time.perf_counter() - generation_started)
     except OllamaError as exc:
         logger.warning("Generate request failed after %.2f seconds: %s", time.perf_counter() - request_started, exc)

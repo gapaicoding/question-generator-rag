@@ -35,6 +35,18 @@ def test_chunker_metadata_and_overlap():
     assert "gamma" in chunks[0]["content"] and "gamma" in chunks[1]["content"]
 
 
+def test_chunker_detects_and_carries_document_sections():
+    pages = [
+        {"page": 3, "text": "LESSON 1 Let Me Introduce Myself\nHello, my name is Rina."},
+        {"page": 4, "text": "I am seven years old and I am from Jakarta."},
+        {"page": 5, "text": "LESSON 2 My Pets\nI have a cat."},
+    ]
+
+    chunks = chunk_pages(pages, "doc", "lesson.pdf", 1200, 200)
+
+    assert [chunk["section"] for chunk in chunks] == ["Lesson 1", "Lesson 1", "Lesson 2"]
+
+
 def test_vector_store_persistence_filter_delete(tmp_path):
     db = VectorStore(tmp_path)
     chunks = [{"document_id": doc, "filename": "x.pdf", "page": 1, "chunk_index": 0, "content": doc} for doc in ("a", "b")]
@@ -43,6 +55,21 @@ def test_vector_store_persistence_filter_delete(tmp_path):
     assert reopened.search("a", [0.0, 1.0], 5)[0]["content"] == "a"
     reopened.delete("a")
     assert not db.exists("a") and db.exists("b")
+
+
+def test_vector_store_search_filters_by_section(tmp_path):
+    db = VectorStore(tmp_path)
+    chunks = [
+        {"document_id": "doc", "filename": "book.pdf", "page": 1, "chunk_index": 0, "section": "Lesson 1", "content": "Greetings and names"},
+        {"document_id": "doc", "filename": "book.pdf", "page": 2, "chunk_index": 0, "section": "Lesson 2", "content": "Numbers and counting"},
+    ]
+    db.add(chunks, [[1.0, 0.0], [0.0, 1.0]])
+
+    results = db.search("doc", [0.0, 1.0], 5, section="Lesson 1")
+
+    assert len(results) == 1
+    assert results[0]["section"] == "Lesson 1"
+    assert results[0]["content"] == "Greetings and names"
 
 
 def test_api_basic():
@@ -71,10 +98,18 @@ class MemoryStore:
     def exists(self, document_id):
         return document_id in self.documents
 
-    def search(self, document_id, embedding, top_k):
+    def list_sections(self, document_id):
+        return list(dict.fromkeys(
+            chunk.get("section", "")
+            for chunk in self.documents.get(document_id, [])
+            if chunk.get("section")
+        ))
+
+    def search(self, document_id, embedding, top_k, section=None):
         return [
-            {"content": chunk["content"], "page": chunk["page"], "chunk_index": chunk["chunk_index"], "distance": 0.1}
-            for chunk in self.documents.get(document_id, [])[:top_k]
+            {"content": chunk["content"], "page": chunk["page"], "chunk_index": chunk["chunk_index"], "section": chunk.get("section", ""), "distance": chunk.get("distance", 0.1)}
+            for chunk in self.documents.get(document_id, [])
+            if section is None or chunk.get("section") == section
         ]
 
     def delete(self, document_id):
@@ -108,6 +143,7 @@ def patch_api(monkeypatch, tmp_path):
             chunk_size=1200,
             chunk_overlap=200,
             top_k=5,
+            max_retrieval_distance=1.2,
             upload_path=tmp_path,
         ),
     )
@@ -174,6 +210,78 @@ def test_api_reports_ollama_and_scanned_pdf_errors(monkeypatch, tmp_path):
     )
     assert response.status_code == 503
     assert response.json()["detail"] == "Ollama service is unavailable."
+
+
+def test_requested_section_detection():
+    assert main.requested_section("Buat soal dari Lesson 01 tentang greeting") == "Lesson 1"
+    assert main.requested_section("Fokus pada BAB II") == "Bab II"
+    assert main.requested_section("sistem pernapasan") is None
+
+
+def test_generate_scopes_retrieval_and_rejects_missing_or_weak_context(monkeypatch, tmp_path):
+    memory_store = patch_api(monkeypatch, tmp_path)
+    document_id = "scoped-doc"
+    memory_store.documents[document_id] = [
+        {"content": "Greeting: Hello. A person introduces their name by saying My name is Rina.", "page": 3, "chunk_index": 0, "section": "Lesson 1"},
+        {"content": "LESSON 2 is about numbers and counting from one to ten.", "page": 14, "chunk_index": 0, "section": "Lesson 2"},
+    ]
+    client = TestClient(app)
+
+    scoped = client.post(
+        "/generate",
+        json={"document_id": document_id, "topic": "buat soal tentang greeting", "scope": "Lesson 1", "question_count": 1},
+    )
+    assert scoped.status_code == 200
+    assert scoped.json()["questions"][0]["sources"][0]["page"] == 3
+
+    missing = client.post(
+        "/generate",
+        json={"document_id": document_id, "topic": "numbers", "scope": "Lesson 3", "question_count": 1},
+    )
+    assert missing.status_code == 422
+    assert "Requested section was not found" in missing.json()["detail"]
+
+    memory_store.documents[document_id] = [
+        {"content": "An unrelated but long passage about geology and rock formation that does not answer the request.", "page": 20, "chunk_index": 0, "section": "Lesson 1", "distance": 1.8},
+    ]
+    weak = client.post(
+        "/generate",
+        json={"document_id": document_id, "topic": "buat soal tentang greeting", "scope": "Lesson 1", "question_count": 1},
+    )
+    assert weak.status_code == 422
+    assert weak.json()["detail"] == "No relevant source material found for this topic."
+
+
+def test_generate_rejects_context_too_short(monkeypatch, tmp_path):
+    memory_store = patch_api(monkeypatch, tmp_path)
+    document_id = "short-context-doc"
+    memory_store.documents[document_id] = [
+        {"content": "Lesson 1: Hello.", "page": 1, "chunk_index": 0, "section": "Lesson 1"},
+    ]
+
+    response = TestClient(app).post(
+        "/generate",
+        json={"document_id": document_id, "topic": "greeting", "scope": "Lesson 1", "question_count": 1},
+    )
+
+    assert response.status_code == 422
+    assert "too short" in response.json()["detail"]
+
+
+def test_generate_falls_back_to_full_document_when_no_sections_exist(monkeypatch, tmp_path):
+    memory_store = patch_api(monkeypatch, tmp_path)
+    document_id = "unstructured-doc"
+    memory_store.documents[document_id] = [
+        {"content": "Hello is a greeting. To introduce a name, say My name is Rina. Ask age with How old are you.", "page": 2, "chunk_index": 0},
+    ]
+
+    response = TestClient(app).post(
+        "/generate",
+        json={"document_id": document_id, "topic": "Lesson 1: greeting and introducing a name", "question_count": 1},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["questions"][0]["sources"][0]["page"] == 2
 
 
 def test_generation_rejects_invalid_model_output_after_retry():

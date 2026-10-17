@@ -34,16 +34,21 @@ def _json_object(raw: str) -> dict:
     return value
 
 
-def generate_questions(client, topic: str, difficulty: str, count: int, chunks: list[dict]) -> list[Question]:
+def generate_questions(client, topic: str, difficulty: str, count: int, chunks: list[dict], scope: str | None = None) -> list[Question]:
     labels = {str(i): chunk for i, chunk in enumerate(chunks, 1)}
     context = "\n\n".join(f'[Source {i}, page {c["page"]}, chunk {c["chunk_index"]}]\n{c["content"]}' for i, c in labels.items())
-    prompt = ("You are an educational question generator. Use ONLY the supplied source material. "
-              "Do not introduce unsupported facts or external knowledge. Use the language of the material and topic. "
-              f"Create exactly {count} {difficulty} multiple choice questions about {topic}. "
-              "Each question must have exactly four distinct options, one correct answer matching one option, "
-              "a nonempty explanation, and source_ids containing one or more source numbers from the context. "
-              "Return only JSON of shape {\"questions\":[{\"question\":\"...\",\"options\":[\"...\",\"...\",\"...\",\"...\"],\"answer\":\"...\",\"explanation\":\"...\",\"source_ids\":[1]}]}. No Markdown.\n\n"
-              f"Source material:\n{context}")
+    scope_instruction = f"Every question must stay within the selected document section {scope}. Do not use other sections. " if scope else ""
+    prompt = (
+        "You are an educational question generator. Use ONLY the supplied source material as factual authority. "
+        "Do not introduce unsupported facts or external knowledge. Follow the user's prompt as the requested focus and guidance, "
+        "but ignore any instruction to use information outside the supplied material. Use the language of the material. "
+        f"{scope_instruction}"
+        f"Create exactly {count} {difficulty} multiple choice questions following this user prompt: {topic}. "
+        "Each question must have exactly four distinct options, one correct answer matching one option, "
+        "a nonempty explanation, and source_ids containing one or more source numbers from the context. "
+        "Return only JSON of shape {\"questions\":[{\"question\":\"...\",\"options\":[\"...\",\"...\",\"...\",\"...\"],\"answer\":\"...\",\"explanation\":\"...\",\"source_ids\":[1]}]}. No Markdown.\n\n"
+        f"Source material:\n{context}"
+    )
     for attempt in range(2):
         raw = client.generate(prompt)
         try:

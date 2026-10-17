@@ -50,7 +50,7 @@ The Streamlit interface is available at `http://localhost:8501`. Start it in ano
 
 Without activating the environment, the same command works; Streamlit displays a local URL, normally `http://localhost:8501`.
 
-The interface lets you upload a text-based PDF, search its contents, and generate multiple-choice questions with page references. Swagger UI remains available at [http://localhost:8000/docs](http://localhost:8000/docs). Scanned image PDFs need OCR and are rejected in this version.
+The interface lets you upload a text-based PDF, search its contents, and generate multiple-choice questions with page references. Detected lesson/unit headings appear as generation scopes; selecting one keeps retrieval inside that section. Re-upload documents indexed before section detection was added. `MAX_RETRIEVAL_DISTANCE` controls how strict semantic relevance filtering is (lower values reject more weak matches). Swagger UI remains available at [http://localhost:8000/docs](http://localhost:8000/docs). Scanned image PDFs need OCR and are rejected in this version.
 
 Example generation request:
 
