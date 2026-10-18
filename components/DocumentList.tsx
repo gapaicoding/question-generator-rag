@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FileText, Search } from "lucide-react";
+import { Database, FileText, Search } from "lucide-react";
 import type { UploadResult } from "./UploadForm";
 import { DeleteDocumentDialog } from "./DeleteDocumentDialog";
 
@@ -44,11 +44,17 @@ export function DocumentList({
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-border bg-bg-card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">Dokumen Terindeks</h2>
-          <p className="text-sm text-text-secondary">Pilih dokumen aktif untuk pencarian dan pembuatan soal.</p>
+    <section className="shadow-card flex flex-col gap-4 rounded-[22px] border border-border bg-surface p-6">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">2</span>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+            <Database className="h-4 w-4" aria-hidden />
+          </span>
+          <div>
+            <h2 className="text-lg font-bold text-text-primary">Dokumen Terindeks</h2>
+            <p className="text-sm text-text-secondary">Pilih dokumen aktif untuk pencarian dan pembuatan soal.</p>
+          </div>
         </div>
         {documents.length > 0 && (
           <p className="text-xs text-text-muted">
@@ -58,7 +64,11 @@ export function DocumentList({
       </div>
 
       {documents.length === 0 ? (
-        <p className="text-sm text-text-secondary">Belum ada dokumen yang diindeks.</p>
+        <div className="flex flex-col items-center gap-2 rounded-xl bg-surface-soft py-8 text-center">
+          <FileText className="h-6 w-6 text-primary" aria-hidden />
+          <p className="text-sm font-medium text-text-primary">Belum ada dokumen terindeks</p>
+          <p className="text-xs text-text-muted">Upload PDF di atas untuk mulai mengindeks materi.</p>
+        </div>
       ) : (
         <>
           <div className="relative">
@@ -68,7 +78,7 @@ export function DocumentList({
               onChange={(e) => setFilter(e.target.value)}
               placeholder="Filter nama file..."
               aria-label="Filter dokumen berdasarkan nama file"
-              className="w-full rounded-lg border border-border bg-bg-raised py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted"
+              className="w-full rounded-xl border border-border-input bg-surface-soft py-2 pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted"
             />
           </div>
 
@@ -81,8 +91,8 @@ export function DocumentList({
                 return (
                   <li
                     key={doc.document_id}
-                    className={`flex flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${
-                      isSelected ? "border-accent-blue bg-bg-hover" : "border-border bg-bg-raised"
+                    className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${
+                      isSelected ? "border-primary bg-primary-soft" : "border-border bg-surface-soft"
                     }`}
                   >
                     <button
@@ -91,9 +101,9 @@ export function DocumentList({
                       aria-pressed={isSelected}
                       className="flex min-w-0 flex-1 items-start gap-3 text-left"
                     >
-                      <FileText className="mt-0.5 h-5 w-5 shrink-0 text-accent-blue" aria-hidden />
+                      <FileText className="mt-0.5 h-5 w-5 shrink-0 text-danger" aria-hidden />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-text-primary" title={doc.filename}>
+                        <span className="block truncate text-[15px] font-semibold text-text-primary" title={doc.filename}>
                           {doc.filename}
                         </span>
                         <span className="mt-0.5 block text-xs text-text-secondary">
@@ -104,7 +114,7 @@ export function DocumentList({
                             {doc.sections.map((section) => (
                               <span
                                 key={section}
-                                className="rounded-full border border-border bg-bg-card px-2 py-0.5 text-[11px] text-text-secondary"
+                                className="rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] text-text-secondary"
                               >
                                 {section}
                               </span>
@@ -116,9 +126,7 @@ export function DocumentList({
                     <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          isSelected
-                            ? "bg-chip-active-bg text-accent-green"
-                            : "border border-border text-text-muted"
+                          isSelected ? "bg-success-soft text-success-text" : "bg-neutral-status-soft text-neutral-status"
                         }`}
                       >
                         {isSelected ? "Aktif" : "Nonaktif"}

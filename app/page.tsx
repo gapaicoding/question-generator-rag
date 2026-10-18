@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { FileQuestion } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { UploadForm } from "@/components/UploadForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DocumentList, type DocumentSummary } from "@/components/DocumentList";
@@ -98,26 +98,38 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-[1160px] flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="btn-gradient flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-            <FileQuestion className="h-6 w-6 text-white" aria-hidden />
+    <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-5 px-4 py-6 sm:px-6 sm:py-8">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border pb-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary">
+            <Sparkles className="h-5 w-5 text-white" aria-hidden />
           </span>
-          <div>
-            <h1 className="text-2xl font-bold leading-tight text-text-primary sm:text-3xl">PDF Question Generator</h1>
-            <p className="text-sm text-text-secondary">Upload dokumen, cari materi, dan generate soal secara otomatis.</p>
-          </div>
+          <span className="text-xl font-extrabold italic text-text-primary">PDF Question Generator</span>
         </div>
         <ThemeToggle />
       </header>
 
-      <UploadForm onUploaded={(result) => refreshDocuments(result.document_id)} />
-
-      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-bg-card p-5">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">Dokumen Terindeks</h2>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-stretch">
+        <div className="flex flex-col justify-center gap-3 lg:col-span-5">
+          <p className="text-sm font-medium text-primary-text">Ubah materi PDF-mu jadi soal latihan!</p>
+          <h1 className="text-4xl font-extrabold italic leading-[1.1] text-text-primary sm:text-5xl">
+            PDF Question Generator
+          </h1>
+          <p className="text-base text-text-secondary">
+            Upload dokumen, cari materi, dan generate soal secara otomatis dari konten PDF.
+          </p>
+          <ul className="flex flex-wrap gap-2 text-xs font-medium text-primary-text">
+            <li className="rounded-full bg-primary-soft px-3 py-1.5">Otomatis diindeks</li>
+            <li className="rounded-full bg-primary-soft px-3 py-1.5">Pencarian materi cepat</li>
+            <li className="rounded-full bg-primary-soft px-3 py-1.5">Generate soal dengan AI</li>
+          </ul>
         </div>
+        <div className="lg:col-span-7">
+          <UploadForm onUploaded={(result) => refreshDocuments(result.document_id)} />
+        </div>
+      </div>
+
+      <section className="shadow-card flex flex-col gap-4 rounded-[22px] border border-border bg-surface p-6">
         <div aria-live="polite">
           {listError && <p className="text-sm text-danger">{listError}</p>}
           {loadingDocuments && <p className="text-sm text-text-secondary">Memuat dokumen...</p>}
@@ -133,28 +145,34 @@ export default function Home() {
 
           <form
             onSubmit={handleGenerate}
-            className="flex flex-col gap-4 rounded-2xl border border-border bg-bg-card p-5"
+            className="shadow-card flex flex-col gap-4 rounded-[22px] border border-border bg-surface-blue p-6"
           >
-            <div>
-              <h2 className="text-lg font-semibold text-text-primary">Generate Soal</h2>
-              <p className="text-sm text-text-secondary">Buat soal otomatis dari dokumen yang dipilih.</p>
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">4</span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+                <Sparkles className="h-4 w-4" aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold text-text-primary">Generate Soal</h2>
+                <p className="text-sm text-text-secondary">Buat soal otomatis dari dokumen yang dipilih.</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm text-text-secondary">
                 Dokumen aktif
-                <span className="truncate rounded-lg border border-border bg-bg-raised px-3 py-2 text-text-primary" title={selected.filename}>
+                <span className="truncate rounded-xl border border-border-input bg-surface px-3 py-2 text-text-primary" title={selected.filename}>
                   {selected.filename}
                 </span>
               </label>
               <label className="flex flex-col gap-1 text-sm text-text-secondary">
-                Topik
+                Topik (opsional)
                 <input
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   placeholder="Topik, mis. sistem pernapasan manusia"
                   required
-                  className="rounded-lg border border-border bg-bg-raised px-3 py-2 text-sm text-text-primary placeholder:text-text-muted"
+                  className="rounded-xl border border-border-input bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm text-text-secondary">
@@ -165,7 +183,7 @@ export default function Home() {
                   max={20}
                   value={questionCount}
                   onChange={(e) => setQuestionCount(Number(e.target.value))}
-                  className="rounded-lg border border-border bg-bg-raised px-3 py-2 text-text-primary"
+                  className="rounded-xl border border-border-input bg-surface px-3 py-2 text-text-primary"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm text-text-secondary">
@@ -173,7 +191,7 @@ export default function Home() {
                 <select
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                  className="rounded-lg border border-border bg-bg-raised px-3 py-2 text-text-primary"
+                  className="rounded-xl border border-border-input bg-surface px-3 py-2 text-text-primary"
                 >
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
@@ -185,9 +203,10 @@ export default function Home() {
             <button
               type="submit"
               disabled={generating || !topic.trim()}
-              className="btn-gradient flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-solid px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {generating ? "Membuat soal..." : "Generate Soal"}
+              <Sparkles className="h-4 w-4" aria-hidden />
+              {generating ? "Sedang membuat soal..." : "Generate Soal"}
             </button>
 
             <div aria-live="polite">{error && <p className="text-sm text-danger">{error}</p>}</div>

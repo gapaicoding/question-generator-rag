@@ -59,9 +59,9 @@ export function DeleteDocumentDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-dialog-title"
-        className="w-full max-w-sm rounded-xl border border-border bg-bg-card p-5"
+        className="shadow-card w-full max-w-sm rounded-2xl border border-border bg-surface p-6"
       >
-        <h3 id="delete-dialog-title" className="text-base font-semibold text-text-primary">
+        <h3 id="delete-dialog-title" className="text-base font-bold text-text-primary">
           Hapus dokumen?
         </h3>
         <p className="mt-2 text-sm text-text-secondary">
@@ -73,7 +73,7 @@ export function DeleteDocumentDialog({
             type="button"
             onClick={onCancel}
             disabled={pending}
-            className="min-h-11 rounded-lg border border-border px-4 text-sm font-medium text-text-primary disabled:opacity-50"
+            className="min-h-11 rounded-xl border border-border-input px-4 text-sm font-medium text-text-primary disabled:opacity-50"
           >
             Batal
           </button>
@@ -82,7 +82,7 @@ export function DeleteDocumentDialog({
             onClick={onConfirm}
             disabled={pending}
             aria-label={`Hapus ${filename}`}
-            className="min-h-11 rounded-lg bg-danger-solid px-4 text-sm font-semibold text-white disabled:opacity-50"
+            className="min-h-11 rounded-xl bg-danger-solid px-4 text-sm font-semibold text-white disabled:opacity-50"
           >
             {pending ? "Menghapus..." : "Hapus"}
           </button>

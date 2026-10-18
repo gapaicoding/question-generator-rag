@@ -1,253 +1,326 @@
 # DESIGN.md — PDF Question Generator
 
-> **Version:** 2.0  
-> **Updated:** 18 October 2026  
-> **Status:** UI/UX implementation specification  
-> **Scope:** Full existing dashboard: upload/index PDF, indexed documents, optional material search, and question generation.  
-> **Reference:** Latest approved full-page dark-mode mockup (`a_detailed_dark_themed_ui_dashboard_mockup_clean.png`).
+> **Version:** 3.0 — Playful × Electric Blue  
+> **Status:** UI implementation specification  
+> **Reference:** Approved Electric Blue + Light Cream full-page mockup (18 October 2026)  
+> **Scope:** Frontend styling, layout, accessibility and interaction states. Preserve existing backend, retrieval/indexing pipeline, API contracts, and business rules.
 
-## 1. Goals and constraints
+## 1. Design direction
 
-Redesign the **existing** PDF Question Generator as a coherent, responsive learning-content workspace, preserving its functional workflows and existing API contracts. The latest reference includes all four sections below the fold; **do not stop at Upload PDF and Dokumen Terindeks**.
+Build a welcoming but efficient educational AI workspace, combining the warmth and rounded shapes of a **Playful** editorial design with the clarity of a structured SaaS dashboard.
 
-- Improve hierarchy, document readability, visual grouping, feedback, and accessibility.
-- Make the **active document** visible, because the existing interface generates questions from the active document.
-- Support optional material search without making it a prerequisite for question generation.
-- Use real backend data and existing actions; the screenshot's text, dates, counts, and metadata are samples.
-- **Frontend redesign only**: do not change PDF parsing, chunking, embedding, RAG retrieval, question generation logic, backend endpoints, persistence, or business rules.
-- Do not introduce unsupported functionality simply because it appears in the visual mockup. A *Details* action, max-file-size badge, document dropdown, and automatic indexing shown in the design must be conditional on actual product/backend support.
+- **Theme:** light by default, warm cream canvas, white elevated cards.
+- **Primary accent:** Electric Blue `#0B72F9` (acceptable tonal range `#0B72F9`–`#2563EB`). **No pink or magenta.**
+- **Typography:** Inter (fallback: system sans). Use bold italic for the page title and selected section headings, not for form labels or content rows.
+- **Visual signature:** friendly blue strokes, large rounded surfaces, restrained decorative doodles, subtle shadows.
+- **Information hierarchy:** upload → indexed documents → optional material search → question generation.
+- **Operational priorities:** legible dense metadata, easy document selection, explicit active state, obvious primary action, keyboard accessibility.
 
-## 2. Full-page information architecture
+### Design boundaries
+
+This is an authenticated/workspace-style productivity page, **not** a marketing landing page. The visual mockup uses an oversized hero for personality; production should keep the hero compact enough that the upload affordance and document list are reached quickly. Decorative elements never obscure inputs or replace functional status messages.
+
+## 2. Design tokens
+
+### 2.1 Color palette
+
+| Token | Hex | Purpose |
+|---|---|---|
+| `--background` | `#F6F2EE` | Warm cream app background |
+| `--surface` | `#FFFFFF` | Main cards and input surfaces |
+| `--surface-soft` | `#F8FAFC` | Secondary rows and soft panels |
+| `--surface-blue` | `#EFF6FF` | Generate section tint and informational highlights |
+| `--primary` | `#0B72F9` | Main CTA, upload button, focus accents, key icons |
+| `--primary-hover` | `#075ED1` | Hover state |
+| `--primary-pressed` | `#064DA9` | Pressed state |
+| `--primary-soft` | `#DBEAFE` | Light-blue backgrounds |
+| `--text-primary` | `#111827` | Main text |
+| `--text-secondary` | `#475569` | Descriptions and metadata |
+| `--text-muted` | `#64748B` | Hints, placeholders |
+| `--border` | `#E7E2DB` | Warm neutral outlines |
+| `--border-input` | `#D8DEE8` | Form controls |
+| `--success` | `#16A34A` | Active status only |
+| `--success-soft` | `#DCFCE7` | Active badge background |
+| `--neutral-status` | `#64748B` | Inactive status |
+| `--neutral-status-soft` | `#F1F5F9` | Inactive badge background |
+| `--danger` | `#DC2626` | Destructive actions and errors |
+| `--danger-soft` | `#FEE2E2` | Destructive feedback |
+| `--focus-ring` | `#93C5FD` | Accessible focus outline |
+
+**Color rules:** Electric Blue is the only decorative accent; green, red and gray are permitted **only** for semantic status and error feedback. Do not introduce purple/pink gradients. Ensure contrast is at least WCAG AA (4.5:1 normal text, 3:1 large text/UI components where applicable). White text on the chosen primary button blue must pass contrast; darken the fill as necessary.
+
+### 2.2 Typography
+
+| Role | Desktop | Mobile | Weight / style |
+|---|---|---|---|
+| Page hero heading | 56–64 px | 34–40 px | 800–900 italic |
+| App wordmark | 22–26 px | 18–20 px | 800 italic |
+| Section heading | 22–26 px | 20–22 px | 700–800; optional italic |
+| Card/document title | 15–16 px | 14–16 px | 650–700 upright |
+| Body / inputs | 15–16 px | 15–16 px | 400–500 |
+| Metadata / helper | 12–14 px | 12–14 px | 400–500 |
+| Button label | 15–16 px | 15–16 px | 600–700 |
+
+Use line-height 1.2 for headings, 1.5–1.6 for body copy. Do not use italic on filenames, form fields, tables or statuses. File names can wrap or truncate with tooltip/title; never overlap actions.
+
+### 2.3 Spacing, radii and elevation
+
+- Base spacing scale: `4, 8, 12, 16, 20, 24, 32, 40, 48, 64` px.
+- Main content width: `min(1200px, calc(100% - 48px))` on desktop; 16px gutters on mobile.
+- Section spacing: 16–24px between stacked cards, not landing-page-sized 113px gaps.
+- Main cards: 22–28px radius; document rows: 12–16px radius; inputs: 10–12px radius; primary buttons: 12–14px radius; badges: pill.
+- Main card padding: 24px desktop, 16px mobile.
+- Shadow: `0 12px 32px rgba(41, 36, 28, 0.055)`; hover elevation should remain subtle.
+- Borders: 1px warm-neutral. Avoid heavy neon glows, strong glassmorphism, and visual noise.
+- Minimum clickable targets: 44 × 44px when practical.
+
+### 2.4 Iconography & decoration
+
+Use consistent 1.75–2px stroke icons (Lucide recommended): `file-sparkles`, `upload-cloud`, `database`, `file-text`, `search`, `book-open`, `ellipsis-vertical`, `trash-2`, `info`, `sparkles`, `check-circle-2`, `loader-circle`, `sun`, `moon`.
+
+Place tiny Electric Blue underline/doodle strokes near the hero title or section corners only. Treat all decoration as `aria-hidden`; hide it on small screens or with reduced-motion preferences. No need for 3D mascots.
+
+## 3. Desktop information architecture
 
 ```text
-PDF Question Generator (single scrollable page)
-├── Header: gradient app icon, title/subtitle, light/dark toggle
-├── 1. Upload PDF
-│   ├── Section heading and helper text
-│   ├── PDF drag-and-drop / native picker
-│   ├── Selected file and validation feedback
-│   ├── Upload & Index (explicit action: retain existing behavior)
-│   └── Upload/index loading/success/error feedback
-├── 2. Dokumen Terindeks
-│   ├── Heading, optional local filename filter
-│   ├── Document stats (optional, derived from actual data)
-│   └── Indexed document rows
-│       ├── PDF icon / filename / page & chunk counts
-│       ├── Lesson tags / indexed timestamp
-│       ├── Active/inactive indicator
-│       ├── Select/activate action (existing behavior)
-│       └── Delete (confirmation)
-├── 3. Cari materi (opsional)
-│   ├── Keyword input (e.g. 'sistem pernapasan')
-│   ├── Cari button
-│   └── Search result / empty / loading / error state
-└── 4. Generate Soal
-    ├── Current active document name
-    ├── Topic text field (optional; keep actual API semantics)
-    ├── Jumlah soal numeric input (example default: 5)
-    ├── Tingkat kesulitan dropdown (example: Medium)
-    ├── Generate Soal button
-    └── Generation progress / result / error (existing workflow)
+┌─────────────────────────────────────────────────────────────────────┐
+│ App logo + PDF Question Generator             Theme toggle / user*  │
+├─────────────────────────────────────────────────────────────────────┤
+│ Compact editorial intro       │  [1] UPLOAD PDF                    │
+│ Large italic heading          │  [ Drag & drop PDF                ] │
+│ Subtitle / 3 quick benefits   │  [ Pilih File PDF ]                 │
+├─────────────────────────────────────────────────────────────────────┤
+│ [2] DOKUMEN TERINDEKS                     [Search docs] [Filter*]   │
+│  [PDF icon] title / pages / chunks / lessons / date   [Aktif] [...] │
+│  [PDF icon] title / pages / chunks / lessons / date [Nonaktif] [...]│
+├─────────────────────────────────────────────────────────────────────┤
+│ [3] CARI MATERI (OPSIONAL)                                          │
+│  [keyword input_________________________________] [Cari]            │
+│  [results area, only after search if API supports it]               │
+├─────────────────────────────────────────────────────────────────────┤
+│ [4] GENERATE SOAL                                                  │
+│  [Dokumen selector]             [Topik (opsional)]                  │
+│  [Jumlah soal]                 [Tingkat kesulitan]                  │
+│  [                        Generate Soal                         ]   │
+│  [generation result panel when returned]                            │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Behavioral source of truth:** The original screenshot displays an `Aktif` chip on one document and dynamically titles the generator `Generate Soal dari "<nama dokumen>"`. Preserve that relationship. A document selector in the mockup is a visual proposal, not evidence of an existing selection API; it may be implemented only if it maps safely to existing document-activation behavior.
+`*` Only include user avatar, document filter, detail drawer or extra actions if the existing product has the corresponding functionality. Do not implement decorative, nonfunctional controls merely because they appear in the mockup.
 
-## 3. Visual style and tokens
+### Layout behavior
 
-Aim for a refined SaaS interface: dark navy/charcoal page, layered dark cards, subtle cool borders, indigo/violet/blue gradient CTAs, restrained glows, clear type. Use a single visual language across **all four sections**.
+- **>= 1024px:** two-column intro/upload, then stacked full-width sections. Intro approximately 42%; upload 58%. The mockup places both in the first row.
+- **768–1023px:** use one column for intro/upload unless both remain comfortable. Other sections remain full-width.
+- **< 768px:** single-column vertical stack, compact hero, controls full-width, metadata wraps safely, each document row becomes a structured card.
+- The overall page scrolls; avoid nested document-list scrolling for a short list.
 
-### 3.1 Palette (approximate implementation targets)
+## 4. Component specifications
 
-| Token | Dark value | Usage |
-|---|---|---|
-| `--bg-page` | `#0A1020` | Page background |
-| `--bg-card` | `#111B2E` | Section surfaces |
-| `--bg-raised` | `#152039` | Inner rows and inputs |
-| `--bg-hover` | `#1D2B47` | Hover/drag-over state |
-| `--border` | `#2B3B57` | Card and input outlines |
-| `--text-primary` | `#F4F7FF` | Headings, important fields |
-| `--text-secondary` | `#B6C5DE` | Metadata and helper text |
-| `--text-muted` | `#8D9DBB` | Placeholders |
-| `--accent-blue` | `#3290FF` | Blue accent / gradient start |
-| `--accent-purple` | `#9547F5` | Violet accent / gradient end |
-| `--accent-green` | `#22C987` | Active status and search icon |
-| `--danger` | `#FF596E` | Deletion and errors |
+### 4.1 Header
 
-Primary action: `linear-gradient(100deg, #3290FF, #655CF7, #9547F5)`. Avoid using gradients for every control; reserve them for primary CTAs and small section glyphs. Never use color as the only distinction for active status.
+- Left: Electric Blue document-with-sparkle icon + *PDF Question Generator* wordmark.
+- Right: theme toggle **only if implemented**. Mockup shows `Light mode`; label should communicate current state or toggle destination consistently.
+- Keep header light/white with restrained divider or shadow. Sticky is optional; if sticky, do not cover heading anchors or dialogs.
+- Do not add an account avatar unless authentication/profile functionality exists.
 
-**Light palette:** page `#F5F7FC`, card `#FFFFFF`, raised `#F6F8FD`, border `#D9E2EF`, primary text `#17233A`, secondary text `#53627B`; reuse accents after checking contrast. Persist theme with existing mechanism if provided.
+### 4.2 Intro / hero
 
-### 3.2 Typography, spacing, elevations
+- Small supportive annotation: `Ubah materi PDF-mu jadi soal latihan!`
+- Hero headline: `PDF Question Generator`, heavy italic, left-aligned on desktop.
+- Supporting sentence: `Upload dokumen, cari materi, dan generate soal secara otomatis dari konten PDF.`
+- Three optional short benefit indicators: `Otomatis diindeks`, `Pencarian materi cepat`, `Generate soal dengan AI`.
+- Decorative blue hand-drawn underline and strokes near headline, never overlapping text.
+- Mobile: reduce display size, simplify decorations; allow the heading to wrap to two lines.
 
-- Font: Inter or current application sans-serif (`system-ui` fallback).
-- Main title: desktop `30–34px/1.2`, mobile `23–26px`; section headings `20–22px`, semibold/bold.
-- Filename: `14–16px`, weight `600`; body `14–16px`; metadata `12–13px`.
-- Spacing scale: `4 / 8 / 12 / 16 / 20 / 24 / 32 / 40px`.
-- Page container `max-width: 1160px`, centered; desktop horizontal padding `24–32px`.
-- Section vertical gaps `16–24px`; cards `16–20px` radius, `18–26px` padding; document rows `10–14px` radius.
-- Border `1px`; shadows/glow subtle and nonessential; transitions `150–200ms`, respecting reduced motion.
-- Icons should be consistent (e.g. Lucide), with accessible text labels on controls.
+### 4.3 Upload PDF
 
-## 4. Layout and responsive behavior
+**Structure:** small blue numbered marker `1`, section title, explanation, optional accurate file-limit note, dropzone, `Pilih File PDF` button.
 
-| Screen | Layout |
-|---|---|
-| Desktop `>=1024px` | One centered content column; full-width cards, document metadata/actions in a row, generation fields in a 2-column grid. |
-| Tablet `768–1023px` | Same card order; metadata and controls may wrap; generation grid can stay two columns if readable. |
-| Mobile `<768px` | `16px` page padding; all four cards stack; document content/actions wrap; search input/button stack as necessary; generate form is single-column; CTA full-width. |
+- Dropzone: dotted warm-gray border, soft white surface, upload-cloud icon and instruction: `Drag & drop file PDF di sini`.
+- Clicking dropzone or its button opens file chooser (`accept="application/pdf,.pdf"`).
+- On selection, show name, size, and an explicit `Upload & Index` action **if the current implementation requires manual submission**. The mockup text suggesting automatic upload must only be used if the app truly auto-uploads after selection.
+- Validate client-side PDF type/size; server remains authoritative. **100 MB is visual-reference placeholder, not a verified backend limit**—display only an actual configured limit.
+- States: idle, drag-over (blue highlight), selected, uploading (progress if available), indexing, success, error/retry.
+- Prevent duplicate submissions during upload/indexing. Announce progress and errors accessibly.
+- Never claim indexing succeeded until server confirms it.
 
-On mobile, long filenames must wrap or ellipsize with accessible full name, controls remain tappable (target ~`44×44px`), lesson chips wrap, and the page must have **no horizontal overflow**. Header theme control can move below or alongside the title. The full interface is a continuous vertical page, not four routes.
+### 4.4 Dokumen Terindeks
 
-## 5. Component and behavior specifications
+**Structure:** blue database icon, title, subtitle, optional document-name search, indexed document rows.
 
-### 5.1 Header
+Each row shows:
 
-Gradient document/sparkle icon; title `PDF Question Generator`; subtitle `Upload dokumen, cari materi, dan generate soal secara otomatis.`; theme toggle (`Light mode` in dark theme, `Dark mode` in light theme) with accessible name and pressed state. Static copy does not receive skeleton loaders.
+- Red PDF-type icon (semantic file representation, not decorative brand accent).
+- Filename, e.g. `E-MODULE PRE A1 STEP 1.pdf_compressed.pdf`.
+- Page count and indexed chunk count (`84 halaman`, `84 chunk`).
+- Lesson or chapter labels (`Lesson 1` … `Lesson 8`), wrapping neatly.
+- Indexed/uploaded timestamp formatted for locale, e.g. `17/10/2026, 15.06.07`.
+- `Aktif` / `Nonaktif` status (or status wording matching the existing domain).
+- Existing action: `Hapus` with confirmation. Optional `Lihat Detail` or overflow menu only when backed by actual functions.
 
-### 5.2 Upload PDF
+**Selection/active state:** screenshot references show one document tagged **Aktif**. Treat this as source-of-truth application state, not a new toggle unless an existing activate/select API exists. If generation is driven by the active document, default the form to that document; if multiple-document selection is supported, reflect it faithfully.
 
-Heading `Upload PDF`, guidance `Pilih file PDF materi pembelajaran untuk diproses dan diindeks.`. Dotted/dashed drop zone: upload icon, `Drag & drop file PDF di sini`, secondary guidance, `Pilih File PDF` picker button. Show selected file name and size. Accepted type PDF only; maximum size follows **actual backend validation**, not the mockup's illustrative `Maks. 100 MB` badge. Never present a non-existent enforced limit.
+**Empty state:** friendly blue document icon + `Belum ada dokumen terindeks` + guidance to upload a PDF.  
+**Loading:** skeleton only for dynamic rows/counts, not static headings.  
+**Error:** nontechnical message + retry when possible.  
+**Deletion:** confirm intent, show pending state, only remove row after confirmed backend success; consider preventing deletion while it is being used for an in-flight operation.
 
-Keep the **existing explicit** `Upload & Index` action. Do not silently switch to auto-upload from the reference image. Disable CTA until valid selection; during upload/indexing disable duplicates. Indicate upload vs indexing stages, and show only genuine progress percentages if available. On successful indexing refresh documents and any summary counters. Preserve backend duplicate-file semantics.
+### 4.5 Cari materi (opsional)
 
-### 5.3 Dokumen Terindeks
+- Section icon: blue magnifying glass.
+- Title and supporting line: `Tambahkan kata kunci untuk memfokuskan materi dari dokumen.`
+- Input placeholder: `mis. sistem pernapasan`.
+- Right-side `Cari` button (blue) on desktop; full width or stacked on mobile.
+- Submit on button or Enter; trim whitespace; disable empty searches if the backend requires a query.
+- Preserve typed query across results. Show `Mencari...`, found matches (with page/lesson/snippet if returned), no-results, and error states.
+- Do not fabricate excerpts, similarity percentages, citation pages, or filter controls absent from the API.
+- **Important:** this search is optional. It must not prevent question generation when empty unless existing business logic says otherwise.
 
-Heading `Dokumen Terindeks`; optional subtitle. Each row contains a PDF icon, full filename, page count, chunk count, detected lessons, localized date/time, status, and actions.
+### 4.6 Generate Soal
 
-- **Active status:** labeled green `Aktif` chip for the document used by generation. Inactive document may show `Nonaktif` or no chip according to true backend state; do not infer active merely from row order.
-- **Activate/select:** if existing UI allows activation, retain that action, show pending status, and update the generation section only after activation succeeds. If current backend provides no selection action, leave the active state read-only.
-- **Delete:** icon/menu with accessible `Hapus <filename>`; use a confirmation modal that distinguishes removing an index from deleting the source PDF if applicable. Use immutable IDs, never filename alone; duplicates in screenshot have same name.
-- **Details:** only show `Lihat Detail` if there is already a real supported detail view/action. Otherwise omit (do not make an inert button).
-- **Stats:** counts like total indexed documents and total chunks are optional, but must be computed from authoritative records with consistent scope; mockup samples are **not** constants.
-- **Search/filter documents:** optional local client-side filename filter. This is distinct from the *Cari materi* semantic/content search below; keep their labels and results conceptually separate.
-- **Lesson badges:** display backend-derived lesson names, wrap as chips if available; gracefully handle documents with no lessons or metadata.
+- Section surface: subtle light-blue `#EFF6FF` tint or near-white with blue header icon; no pink wash.
+- Blue file/sparkles icon, heading `Generate Soal`, short description, informational helper panel.
+- Two-column grid on desktop, one-column on mobile:
+  1. **Dokumen** — dropdown if multiple selectable indexed documents are supported; otherwise display active document as read-only.
+  2. **Topik (opsional)** — text input with placeholder `Topik, mis. sistem pernapasan manusia`.
+  3. **Jumlah soal** — numeric input, initial example `5`; enforce existing backend min/max (do not invent limits).
+  4. **Tingkat kesulitan** — select using API-defined values; mockup shows `Medium` (other options must match existing backend enums).
+- CTA `Generate Soal`, full-width solid Electric Blue with a sparkle icon and white accessible text.
+- During generation: disabled submit, spinner plus `Sedang membuat soal...`, maintain form values.
+- On success: show the **actual returned** question/result content in an accessible result panel below the form. Preserve current app result format, answer keys and export capabilities if they already exist; do not assume any unimplemented features.
+- On failure: clear recoverable message and retry, without losing user input.
+- If there is no valid document: disable generation and explain why.
 
-States: initial loading, empty, load error with retry, delete pending/error, and current document highlighted without relying on color alone.
-
-### 5.4 Cari materi (opsional)
-
-Heading `Cari materi (opsional)`; helper `Tambahkan kata kunci untuk memfokuskan materi dari dokumen.`. One keyword input (`mis. sistem pernapasan`) plus secondary green-outline `Cari` button, search icon, keyboard Enter submission. Do not submit blank trimmed terms unless existing search behavior explicitly supports it.
-
-Searching is **not mandatory** to generate a question. Preserve current search request, document scope, and result semantics. Display any returned material results in an accessible panel immediately below the search row using actual snippets/metadata when available. If search returns nothing, show neutral `Materi tidak ditemukan.`; on errors offer retry. Do not present fabricated chunks, relevance scores, citations, or AI answers. Clear/reset behavior follows existing UI.
-
-### 5.5 Generate Soal
-
-Heading `Generate Soal`, subtitle `Buat soal otomatis dari dokumen yang dipilih.`. Show the **actual current active document** as context (original UI: `Generate Soal dari "<filename>"`). If a document selector is added, it must be backed by existing activation logic, not a purely visual dropdown.
-
-| Field | UI | Semantics |
-|---|---|---|
-| Dokumen | Current active document; optional supported selector | Must match the document passed to generation. |
-| Topik | Text input, placeholder `Topik, mis. sistem pernapasan manusia` | Optional only if backend genuinely allows omission; otherwise explain required input. |
-| Jumlah soal | Number input, sample value `5` | Positive integer, bounded by actual API constraints; don't invent maximum. |
-| Tingkat kesulitan | Select, screenshot shows `Medium` | Values/options and submitted enum exactly match the existing backend. Do not assume translated display text is an API value. |
-| Generate Soal | Full-width gradient primary button | Calls existing generation action once with existing payload. |
-
-Layout: desktop two-column grid for document/topic and count/difficulty; full-width action underneath. On mobile, stack in reading order. Preserve form state when reasonable, disable Generate when no active document/invalid form or request is in flight, and provide descriptive validation errors.
-
-**Generation states:** idle, submitting/generating (progress feedback without made-up percentages), succeeded (render existing result/answer-key UI or navigate exactly as already implemented), empty result, failed (retry without duplicate submission). A result design is not visible in either screenshot; **do not invent result layout/response contracts** beyond existing application functionality.
-
-### 5.6 Empty/error/confirmation UX
-
-- Upload: invalid type/size, upload failure, indexing failure, success.
-- Document list: loading, no documents, fetch error, delete confirmation, delete success/failure.
-- Material search: loading, no hits, results, error.
-- Generation: no active document, invalid count/topic, loading, success, error.
-- Skeletons appear only where variable data loads, **not** on static headings or fixed help text.
-- Use real error messages mapped to safe user-facing copy (no stack traces, tokens, internal paths).
-
-## 6. Accessibility
-
-Target WCAG 2.2 AA: text contrast `>=4.5:1` (normal text), meaningful non-text elements `>=3:1` as applicable, visible focus rings, logical heading/Tab order, proper label-to-input association, Esc/keyboard focus management in dialogs, and `aria-live` for asynchronous status. Native picker must remain available for people who cannot drag-and-drop. Avoid icons or color alone as labels; avoid fake disabled states. Format timestamps according to application locale/timezone.
-
-## 7. UI-facing data model (conceptual, not API contract)
-
-```ts
-type IndexedDocumentView = {
-  id: string;                 // stable backend identifier
-  filename: string;
-  pageCount: number | null;
-  chunkCount: number | null;
-  lessons: string[];
-  indexedAt: string | null;
-  isActive: boolean;          // derive from authoritative selection state
-};
-
-type GenerateFormView = {
-  activeDocumentId: string | null;
-  topic: string;
-  questionCount: number;
-  difficulty: string;          // retain actual backend enum mapping
-};
-```
-
-Adapt this shape through selectors/adapters if necessary, rather than changing existing endpoint payloads. The original screenshot shows two documents with identical filenames; actions MUST identify records by ID. Optional statistics must be scoped correctly when pagination/filtering exists.
-
-## 8. Suggested frontend components
+## 5. Interaction model
 
 ```text
-src/
-  components/
-    app-header.tsx
-    theme-toggle.tsx
-    pdf-upload-card.tsx
-    pdf-dropzone.tsx
-    upload-status.tsx
-    indexed-documents-card.tsx
-    document-row.tsx
-    document-status-badge.tsx
-    delete-document-dialog.tsx
-    material-search-card.tsx
-    material-search-results.tsx
-    generate-questions-card.tsx
-    generation-status.tsx
-    ui/...
-  hooks/           # reuse existing API/state hooks
-  styles/          # design tokens/theme
+Upload PDF → file validation → upload → server-side index → document list refresh
+                                                       ↓
+                              active/selected indexed document
+                                                       ↓
+                 optional material search / optional topic
+                                                       ↓
+             question count + difficulty → Generate Soal
+                                                       ↓
+                   loading → success results / error
 ```
 
-Component paths are indicative; align with current repository's framework, naming and design-system conventions. A large structural rewrite is not necessary.
+**Source of truth:** keep all persisted statuses, documents, indexing completion and generated output synchronized with the backend. Never fake state changes to make the UI look complete.
 
-## 9. Codex implementation sequence
+### UI state matrix
 
-1. Inspect present frontend, component structure, endpoints/hooks, active-document state, search workflow, generation options/output, and existing tests.
-2. Introduce tokens and themed layout without changing data contracts.
-3. Refactor header, upload, and indexed documents including active badge and deletion confirmation.
-4. Implement the **Cari materi** section with existing request/result state and clear separation from filename filtering.
-5. Implement the **Generate Soal** configuration using real active document, validation, API enum values, and existing result-handling flow.
-6. Add loading, empty, success, failure, keyboard, accessibility, and responsive behaviors to all four sections.
-7. Run the repo's lint, typecheck, unit/integration tests, build, and browser smoke tests at 375px, 768px, 1280px; verify zero horizontal overflow and preserved real workflows.
+| Component | Idle | Loading | Success | Empty / error |
+|---|---|---|---|---|
+| Upload | Dropzone + picker | Upload/index progress | Confirmed indexed PDF | Validation/retry feedback |
+| Indexed documents | Rows + controls | Row skeletons | Accurate metadata/status | Empty instruction/error |
+| Material search | Editable input | Searching button state | API-backed snippets | No matches/error |
+| Generate | Editable form | Generating state | Results section | Missing document/API failure |
 
-### Ready-to-use Codex prompt
+## 6. Accessibility & responsive standards
 
-> Read `DESIGN.md` version 2.0 and inspect the existing PDF Question Generator code before editing. Redesign the complete single-page dashboard to match the latest full-page dark-mode mockup, including Upload PDF, Dokumen Terindeks with active document state, Cari materi (opsional), and Generate Soal. Preserve all existing backend endpoints, question-generation semantics, selected active document, search/indexing flows, and result rendering. Use live data, not screenshot constants. Treat optional mockup-only features (document details, dropdown selection, size limit badge, auto-indexing) as non-requirements unless already supported. Implement responsive, accessible dark/light styles and all asynchronous states. Test the original workflows end to end, run lint/typecheck/build, and report modified files and test outcomes.
+- All fields have visible `<label>` elements; placeholders are not labels.
+- Keyboard focus visible (`2–3px` Electric Blue focus ring, sufficient offset); support keyboard file-picker, dropdowns and confirmation dialogs.
+- Dropzone should have a usable file input; drag/drop is a progressive enhancement, not the only upload method.
+- No color-only differentiation: status badges include `Aktif` / `Nonaktif` text.
+- Announce asynchronous feedback with `aria-live`; dialogs trap focus and return focus on close.
+- Disabled states are visually distinct and explain the reason where relevant.
+- Respect `prefers-reduced-motion`; decorative arrows can remain static.
+- On 320–390px widths, avoid horizontal page scroll and clipped document actions. Keep buttons touch-friendly.
+- Font/body sizes should not drop below 14px solely to fit dense document metadata.
+- Dark-mode toggle, if present, requires a complete dark theme token set rather than automatic CSS inversion. Light cream is the approved default.
+
+## 7. Suggested React component tree
+
+```text
+QuestionGeneratorPage
+├── AppHeader
+│   └── ThemeToggle?                   (only if implemented)
+├── IntroUploadGrid
+│   ├── IntroHero
+│   └── PdfUploadCard
+│       ├── PdfDropzone
+│       └── UploadProgress
+├── IndexedDocumentsCard
+│   ├── DocumentSearch?                (optional supported capability)
+│   └── DocumentRow[]
+│       ├── DocumentMetadata
+│       ├── DocumentStatusBadge
+│       └── DeleteDocumentDialog
+├── MaterialSearchCard
+│   └── MaterialSearchResults
+└── GenerateQuestionsCard
+    ├── DocumentSelection
+    ├── TopicInput
+    ├── QuestionCountInput
+    ├── DifficultySelect
+    ├── GenerateButton
+    └── GeneratedQuestionsResult
+```
+
+Prefer existing component libraries, state management and data-fetching patterns already installed in the repository. Do not add a new UI dependency only to achieve rounded corners or icons if the existing stack can implement them.
+
+## 8. CSS token starter
+
+```css
+:root {
+  --background: #f6f2ee;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --surface-blue: #eff6ff;
+  --primary: #0b72f9;
+  --primary-hover: #075ed1;
+  --primary-pressed: #064da9;
+  --primary-soft: #dbeafe;
+  --text-primary: #111827;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --border: #e7e2db;
+  --border-input: #d8dee8;
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --focus-ring: #93c5fd;
+  --radius-card: 24px;
+  --radius-row: 14px;
+  --radius-input: 12px;
+  --shadow-card: 0 12px 32px rgba(41, 36, 28, .055);
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+```
+
+These values are **implementation approximations from the approved visual mockup**, not pixel-sampled measurements. Prioritize overall visual hierarchy, consistency and accessible behavior over arbitrary pixel matching.
+
+## 9. Implementation phases for Codex
+
+1. **Inventory current frontend:** identify routes, components, CSS/Tailwind conventions, API calls, existing backend-validated input constraints, document active-status behavior, results UI and error states.
+2. **Set theme primitives:** add light-cream/Electric-Blue tokens, typography, background, card and button styles; keep old functionality intact.
+3. **Implement layout:** header, intro/upload row, document list, optional search, generator and existing result area.
+4. **Component polish:** responsive document rows, status badges, upload drag-over/feedback, consistent labels, dialogs, focus states.
+5. **Functional regression:** upload, index, list, active-document behavior, delete, material search, generate and results.
+6. **Viewport checks:** 1440px, 1024px, 768px, 390px, 320px. Verify no horizontal overflow and no lost actions.
+7. **Quality gates:** lint, typecheck, production build and current test suite. Add targeted tests for any changed interaction behavior.
+
+### Codex implementation prompt
+
+> Review `DESIGN.md` and inspect the current frontend in this repository. Implement the approved **PDF Question Generator — Playful × Electric Blue (Light Cream)** redesign with all existing workflow sections: intro/upload, indexed documents, optional material search, question generation and existing generated-results UI. Preserve existing routes, backend/API contracts, PDF validation limits, indexing behavior, active-document rules and business logic. Do not introduce placeholder buttons or new unsupported features simply to match the mockup. Prefer existing React/CSS/Tailwind components and dependencies. Implement responsive desktop/mobile layouts and all loading/empty/error/confirmation states. Run lint/typecheck/build/tests and report exact results plus any missing backend capability needed for elements shown in the mockup.
 
 ## 10. Acceptance criteria
 
-- [ ] All **four** dashboard sections are present in the correct vertical order.
-- [ ] Layout matches the approved dark-mode mockup while keeping existing actual behavior.
-- [ ] Theme toggle works in dark and light, preserving contrast.
-- [ ] PDF picker, drag/drop, explicit `Upload & Index`, and status handling work.
-- [ ] Documents show real metadata, real active status, and correct targeted deletion.
-- [ ] Activating a document, if supported, updates the generator context reliably.
-- [ ] Material search remains optional; real search results and empty/error states are displayed.
-- [ ] Generate section passes correct active document, topic, count, and difficulty to existing API.
-- [ ] Generation success continues to the existing results presentation; errors are recoverable.
-- [ ] Responsive layouts at 375px/768px/1280px are usable with no horizontal overflow.
-- [ ] No hardcoded screenshot values, fake progress, dead buttons, or unsupported new endpoints.
-- [ ] No regression in upload, indexing, document selection, search, generation, or deletion.
+- [ ] Whole page uses the warm cream + Electric Blue palette, with **no pink/magenta** UI accent.
+- [ ] Hero and upload share a clear desktop first row and stack correctly on mobile.
+- [ ] Indexed documents render actual filename, counts, lessons, timestamp and correct active status.
+- [ ] Upload, indexing, material search, delete and question generation still work against the same backend.
+- [ ] No invented storage limits, difficulty enums, status toggles or detail actions.
+- [ ] Search and generation remain usable without optional topic input.
+- [ ] Loading, empty, success and error states are present and accurate.
+- [ ] Primary button is visually dominant and meets contrast requirements.
+- [ ] Keyboard and mobile interactions are usable, no clipped metadata/actions.
+- [ ] Responsive widths 320px–1440px verified.
+- [ ] Existing generated-result UI is retained and visually integrated.
+- [ ] Existing tests, typecheck and production build pass, or failures are documented.
 
-## 11. Visual references and caveats
+---
 
-- **Primary:** `a_detailed_dark_themed_ui_dashboard_mockup_clean.png` — newest complete four-section page.
-- **Secondary:** `dasbor_generator_pertanyaan_pdf.png` — first approved upload/document styling direction.
-- **Existing UI screenshot:** establishes the real `Aktif` state, separate optional material search, topic/count/difficulty controls, and `Generate Soal dari "..."` document context.
-
-Mockups depict **appearance**, not authoritative system behavior. Where visuals conflict with established functionality (such as automatic indexing instead of an explicit `Upload & Index` action), **preserve established functionality**.
-
-## 12. Liveliness dial (implementation addendum)
-
-This spec doesn't state ENERGY/RHYTHM/MOTION values, so the implementation is recorded here for future additions to calibrate against:
-
-- **ENERGY 2**: Stripe/Vercel-tier polish (gradient CTAs, layered surfaces), not Awwwards-bold and not GOV.UK-flat.
-- **RHYTHM 2**: the four sections (Upload, Dokumen Terindeks, Cari materi, Generate Soal) each have a genuinely different internal composition driven by their content, with a few shared conventions (card shell, label style).
-- **MOTION 1**: hover/focus-visible transitions only, no loops, no scroll-driven or decorative animation.
+**Design intent:** A confident, lively education-AI interface, pairing *editorial Playful composition* with *operational SaaS clarity*. Keep the workflow recognizable; change presentation, not semantics.

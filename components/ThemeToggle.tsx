@@ -34,7 +34,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-pressed={theme === "dark"}
-      className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-bg-card px-3 text-sm font-medium text-text-primary transition-colors hover:bg-bg-hover"
+      className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-border-input bg-surface px-3 text-sm font-medium text-text-primary transition-colors hover:bg-surface-soft"
     >
       {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
       {theme === "dark" ? "Light mode" : "Dark mode"}
