@@ -243,3 +243,11 @@ Component paths are indicative; align with current repository's framework, namin
 - **Existing UI screenshot:** establishes the real `Aktif` state, separate optional material search, topic/count/difficulty controls, and `Generate Soal dari "..."` document context.
 
 Mockups depict **appearance**, not authoritative system behavior. Where visuals conflict with established functionality (such as automatic indexing instead of an explicit `Upload & Index` action), **preserve established functionality**.
+
+## 12. Liveliness dial (implementation addendum)
+
+This spec doesn't state ENERGY/RHYTHM/MOTION values, so the implementation is recorded here for future additions to calibrate against:
+
+- **ENERGY 2**: Stripe/Vercel-tier polish (gradient CTAs, layered surfaces), not Awwwards-bold and not GOV.UK-flat.
+- **RHYTHM 2**: the four sections (Upload, Dokumen Terindeks, Cari materi, Generate Soal) each have a genuinely different internal composition driven by their content, with a few shared conventions (card shell, label style).
+- **MOTION 1**: hover/focus-visible transitions only, no loops, no scroll-driven or decorative animation.

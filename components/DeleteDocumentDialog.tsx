@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+
+const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function DeleteDocumentDialog({
   filename,
@@ -14,19 +17,45 @@ export function DeleteDocumentDialog({
   onCancel: () => void;
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     cancelRef.current?.focus();
+
+    const main = document.querySelector("main");
+    main?.setAttribute("inert", "");
+    main?.setAttribute("aria-hidden", "true");
+
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onCancel();
+      if (e.key === "Escape") {
+        onCancel();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      main?.removeAttribute("inert");
+      main?.removeAttribute("aria-hidden");
+    };
   }, [onCancel]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-dialog-title"
@@ -59,6 +88,7 @@ export function DeleteDocumentDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

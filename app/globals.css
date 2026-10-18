@@ -13,6 +13,7 @@
   --accent-blue: #246fd6;
   --accent-purple: #9547f5;
   --accent-green: #15803d;
+  --chip-active-bg: #dcfce7;
   --danger: #c8233f;
   --danger-solid: #c8233f;
   --gradient-primary: linear-gradient(100deg, #1e6fe0, #655cf7, #9547f5);
@@ -33,6 +34,7 @@
   --accent-blue: #3290ff;
   --accent-purple: #9547f5;
   --accent-green: #22c987;
+  --chip-active-bg: #10261e;
   --danger: #ff596e;
   --gradient-primary: linear-gradient(100deg, #1e6fe0, #655cf7, #9547f5);
 }
@@ -49,6 +51,7 @@
   --color-accent-blue: var(--accent-blue);
   --color-accent-purple: var(--accent-purple);
   --color-accent-green: var(--accent-green);
+  --color-chip-active-bg: var(--chip-active-bg);
   --color-danger: var(--danger);
   --color-danger-solid: var(--danger-solid);
   --color-background: var(--background);

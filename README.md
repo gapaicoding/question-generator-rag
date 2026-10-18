@@ -1,6 +1,6 @@
 # PDF Question Generator
 
-Next.js app that extracts text from a PDF, embeds page-aware chunks with the Google Gemini API, stores them in Postgres (`pgvector`) on Neon, and generates grounded multiple-choice questions. Deployable for free on Vercel — no local LLM or GPU required.
+Next.js app that extracts text from a PDF, embeds page-aware chunks with the Google Gemini API, stores them in Postgres (`pgvector`) on Neon, and generates grounded multiple-choice questions. Deployable for free on Vercel: no local LLM or GPU required.
 
 ## Requirements
 

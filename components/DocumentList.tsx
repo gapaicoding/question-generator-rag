@@ -117,7 +117,7 @@ export function DocumentList({
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                           isSelected
-                            ? "bg-accent-green/15 text-accent-green"
+                            ? "bg-chip-active-bg text-accent-green"
                             : "border border-border text-text-muted"
                         }`}
                       >

@@ -13,6 +13,7 @@ All notable changes to this project are documented here.
 - Replaced ChromaDB with Postgres + `pgvector` hosted on Neon.
 - Replaced the Streamlit UI with a React UI: upload, search, generate, and document management with multi-document switching.
 - Replaced `pdf-parse` with `unpdf` after `pdf-parse`'s `pdfjs-dist` dependency crashed on Vercel's serverless runtime (`ReferenceError: DOMMatrix is not defined`, a browser-only API pdf-parse's bundled PDF.js build referenced outside a DOM).
+- Replaced the "Aktif" document chip's opacity-blend background (`bg-accent-green/15`, contrast unpredictable per theme) with dedicated solid tokens `--chip-active-bg` so it reliably clears WCAG AA in both themes.
 
 ### Added
 
@@ -31,13 +32,15 @@ All notable changes to this project are documented here.
 - Under-sized "Hapus" delete button tap target, now a 44×44px minimum.
 - Card/input border contrast (raised from ~1.3-1.9:1 to `zinc-500`, clearing the 3:1 non-text guideline in both themes).
 - Hydration mismatch warning from the theme-init script mutating `<html>`'s class before React hydrates (`suppressHydrationWarning` on the intentional mismatch).
+- `DeleteDocumentDialog` had no focus trap: Tab could leave the open dialog into the page behind it, which also wasn't marked `inert`/`aria-hidden`. Now portals to `document.body`, traps Tab/Shift+Tab, and marks `<main>` inert while open.
 
 ### Verification
 
 - `npm run build`: compiles clean, all 5 API routes present, no TypeScript errors.
 - Verified end-to-end against the live Gemini API and Neon database, locally and in production on Vercel: upload, search, generate, and delete all tested with real requests.
 - antislop audit (`anti-slop/audit-001-2026-10-17.md`): 7 findings (contrast, loading/empty states, tap targets, theme toggle, design direction, mobile verification), all fixed and re-verified via the contrast checker and Playwright at 375px/360px with zero console errors.
-- DESIGN.md v2.0 redesign: every new color token checked against the contrast script (several spec values adjusted — borders, light-mode danger/green, the gradient button's blue stop — to actually clear WCAG AA); full upload -> select -> search -> generate -> delete-with-confirmation workflow re-run end to end at 375px/768px/1280px in both themes with Playwright, zero horizontal overflow and zero console errors at every breakpoint.
+- DESIGN.md v2.0 redesign: every new color token checked against the contrast script (several spec values adjusted, including borders, light-mode danger/green, and the gradient button's blue stop, so they actually clear WCAG AA); full upload -> select -> search -> generate -> delete-with-confirmation workflow re-run end to end at 375px/768px/1280px in both themes with Playwright, zero horizontal overflow and zero console errors at every breakpoint.
+- antislop audit 002 (`anti-slop/audit-002-2026-10-18.md`): 3 findings on the redesigned UI (chip contrast, dialog focus trap, undeclared liveliness dial), all fixed and re-verified live in the browser (computed chip colors read directly from the DOM, Tab/Shift+Tab wrapping confirmed, `inert` toggling confirmed) with zero console errors.
 
 ## [0.1.0] - 2026-10-17
 
