@@ -6,6 +6,8 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- Redesigned the UI per `DESIGN.md` v2.0: dark-navy/charcoal SaaS visual language (with a matching light theme), gradient primary CTAs, a header with a gradient app icon, drag-and-drop PDF upload, redesigned document rows with lesson-chip badges and an accessible delete-confirmation dialog, a two-column "Generate Soal" layout on desktop, and Lucide icons throughout. All backend endpoints, question-generation semantics, and document-activation behavior are unchanged.
+
 - Migrated the stack from Python (FastAPI + Streamlit + Ollama + ChromaDB) to Next.js (TypeScript, App Router), deployable for free on Vercel. Chunking, PDF extraction, retrieval, and generation logic were ported 1:1 to TypeScript.
 - Replaced Ollama with the Google Gemini API: `gemini-embedding-001` for embeddings (768-dim, via `outputDimensionality`), `gemini-3.8-flash` for generation.
 - Replaced ChromaDB with Postgres + `pgvector` hosted on Neon.
@@ -18,6 +20,9 @@ All notable changes to this project are documented here.
 - `DESIGN.md` declaring explicit design direction (calm/utility, dial ENERGY 1 / RHYTHM 1 / MOTION 1).
 - Manual light/dark theme toggle (`components/ThemeToggle.tsx`) with `localStorage` persistence and a head-inline anti-FOUC script.
 - `scripts/migrate.ts` to apply the Neon schema (`documents`, `chunks` + `pgvector`, `ivfflat` index).
+- `components/DeleteDocumentDialog.tsx`: accessible confirmation modal (focus on open, Escape to close) for document deletion, replacing the bare inline delete button.
+- `lib/constants.ts`: shared `MAX_PDF_BYTES_DEFAULT`/`formatBytes` so the upload UI's displayed size limit can never drift from the server's actual validation.
+- Client-side filename filter on the document list (separate from the semantic "Cari materi" search).
 
 ### Fixed
 
@@ -32,6 +37,7 @@ All notable changes to this project are documented here.
 - `npm run build`: compiles clean, all 5 API routes present, no TypeScript errors.
 - Verified end-to-end against the live Gemini API and Neon database, locally and in production on Vercel: upload, search, generate, and delete all tested with real requests.
 - antislop audit (`anti-slop/audit-001-2026-10-17.md`): 7 findings (contrast, loading/empty states, tap targets, theme toggle, design direction, mobile verification), all fixed and re-verified via the contrast checker and Playwright at 375px/360px with zero console errors.
+- DESIGN.md v2.0 redesign: every new color token checked against the contrast script (several spec values adjusted — borders, light-mode danger/green, the gradient button's blue stop — to actually clear WCAG AA); full upload -> select -> search -> generate -> delete-with-confirmation workflow re-run end to end at 375px/768px/1280px in both themes with Playwright, zero horizontal overflow and zero console errors at every breakpoint.
 
 ## [0.1.0] - 2026-10-17
 

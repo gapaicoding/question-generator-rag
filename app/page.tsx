@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { FileQuestion } from "lucide-react";
 import { UploadForm } from "@/components/UploadForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DocumentList, type DocumentSummary } from "@/components/DocumentList";
@@ -33,7 +34,7 @@ export default function Home() {
     try {
       const res = await fetch("/api/documents");
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? "Failed to load documents.");
+      if (!res.ok) throw new Error(data.detail ?? "Gagal memuat dokumen.");
       const docs = data.documents as DocumentSummary[];
       setDocuments(docs);
       if (selectId) {
@@ -42,7 +43,7 @@ export default function Home() {
         setSelected((prev) => (prev ? docs.find((d) => d.document_id === prev.document_id) ?? null : null));
       }
     } catch (err) {
-      setListError(err instanceof Error ? err.message : "Failed to load documents.");
+      setListError(err instanceof Error ? err.message : "Gagal memuat dokumen.");
     } finally {
       setLoadingDocuments(false);
     }
@@ -57,7 +58,7 @@ export default function Home() {
       const res = await fetch(`/api/documents/${documentId}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail ?? "Delete failed.");
+        throw new Error(data.detail ?? "Gagal menghapus dokumen.");
       }
       if (selected?.document_id === documentId) {
         setSelected(null);
@@ -65,13 +66,13 @@ export default function Home() {
       }
       await refreshDocuments();
     } catch (err) {
-      setListError(err instanceof Error ? err.message : "Delete failed.");
+      setListError(err instanceof Error ? err.message : "Gagal menghapus dokumen.");
     }
   }
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    if (!selected || !topic.trim()) return;
+    if (!selected || !topic.trim() || generating) return;
     setGenerating(true);
     setError(null);
     setQuestions([]);
@@ -87,33 +88,44 @@ export default function Home() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? "Generate failed.");
+      if (!res.ok) throw new Error(data.detail ?? "Gagal membuat soal.");
       setQuestions(data.questions);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generate failed.");
+      setError(err instanceof Error ? err.message : "Gagal membuat soal.");
     } finally {
       setGenerating(false);
     }
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">PDF Question Generator</h1>
+    <main className="mx-auto flex w-full max-w-[1160px] flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="btn-gradient flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
+            <FileQuestion className="h-6 w-6 text-white" aria-hidden />
+          </span>
+          <div>
+            <h1 className="text-2xl font-bold leading-tight text-text-primary sm:text-3xl">PDF Question Generator</h1>
+            <p className="text-sm text-text-secondary">Upload dokumen, cari materi, dan generate soal secara otomatis.</p>
+          </div>
+        </div>
         <ThemeToggle />
-      </div>
+      </header>
 
       <UploadForm onUploaded={(result) => refreshDocuments(result.document_id)} />
 
-      <div className="flex flex-col gap-3 rounded-lg border border-zinc-500 p-4">
-        <h2 className="text-lg font-semibold">Dokumen Terindex</h2>
-        {listError && <p className="text-sm text-red-600 dark:text-red-400">{listError}</p>}
-        {loadingDocuments ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Memuat dokumen...</p>
-        ) : (
+      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-bg-card p-5">
+        <div>
+          <h2 className="text-lg font-semibold text-text-primary">Dokumen Terindeks</h2>
+        </div>
+        <div aria-live="polite">
+          {listError && <p className="text-sm text-danger">{listError}</p>}
+          {loadingDocuments && <p className="text-sm text-text-secondary">Memuat dokumen...</p>}
+        </div>
+        {!loadingDocuments && (
           <DocumentList documents={documents} selectedId={selected?.document_id ?? null} onSelect={setSelected} onDelete={handleDelete} />
         )}
-      </div>
+      </section>
 
       {selected && (
         <>
@@ -121,18 +133,31 @@ export default function Home() {
 
           <form
             onSubmit={handleGenerate}
-            className="flex flex-col gap-3 rounded-lg border border-zinc-500 p-4"
+            className="flex flex-col gap-4 rounded-2xl border border-border bg-bg-card p-5"
           >
-            <h2 className="text-lg font-semibold">Generate Soal dari &quot;{selected.filename}&quot;</h2>
-            <input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Topik, mis. sistem pernapasan manusia"
-              className="rounded border border-zinc-500 px-3 py-2 text-sm dark:bg-zinc-900"
-              required
-            />
-            <div className="flex gap-3">
-              <label className="flex flex-1 flex-col text-sm">
+            <div>
+              <h2 className="text-lg font-semibold text-text-primary">Generate Soal</h2>
+              <p className="text-sm text-text-secondary">Buat soal otomatis dari dokumen yang dipilih.</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-sm text-text-secondary">
+                Dokumen aktif
+                <span className="truncate rounded-lg border border-border bg-bg-raised px-3 py-2 text-text-primary" title={selected.filename}>
+                  {selected.filename}
+                </span>
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-text-secondary">
+                Topik
+                <input
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Topik, mis. sistem pernapasan manusia"
+                  required
+                  className="rounded-lg border border-border bg-bg-raised px-3 py-2 text-sm text-text-primary placeholder:text-text-muted"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-text-secondary">
                 Jumlah soal
                 <input
                   type="number"
@@ -140,15 +165,15 @@ export default function Home() {
                   max={20}
                   value={questionCount}
                   onChange={(e) => setQuestionCount(Number(e.target.value))}
-                  className="rounded border border-zinc-500 px-3 py-2 dark:bg-zinc-900"
+                  className="rounded-lg border border-border bg-bg-raised px-3 py-2 text-text-primary"
                 />
               </label>
-              <label className="flex flex-1 flex-col text-sm">
+              <label className="flex flex-col gap-1 text-sm text-text-secondary">
                 Tingkat kesulitan
                 <select
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
-                  className="rounded border border-zinc-500 px-3 py-2 dark:bg-zinc-900"
+                  className="rounded-lg border border-border bg-bg-raised px-3 py-2 text-text-primary"
                 >
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
@@ -156,14 +181,16 @@ export default function Home() {
                 </select>
               </label>
             </div>
+
             <button
               type="submit"
-              disabled={generating}
-              className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
+              disabled={generating || !topic.trim()}
+              className="btn-gradient flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {generating ? "Membuat soal..." : "Generate"}
+              {generating ? "Membuat soal..." : "Generate Soal"}
             </button>
-            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+            <div aria-live="polite">{error && <p className="text-sm text-danger">{error}</p>}</div>
           </form>
 
           <QuestionList questions={questions} />

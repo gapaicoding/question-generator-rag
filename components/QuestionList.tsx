@@ -12,22 +12,22 @@ export function QuestionList({ questions }: { questions: Question[] }) {
   return (
     <ol className="flex flex-col gap-4">
       {questions.map((q, i) => (
-        <li key={i} className="rounded-lg border border-zinc-500 p-4">
-          <p className="font-medium">
+        <li key={i} className="rounded-2xl border border-border bg-bg-card p-5">
+          <p className="font-medium text-text-primary">
             {i + 1}. {q.question}
           </p>
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             {q.options.map((option, j) => (
               <li
                 key={j}
-                className={option === q.answer ? "font-semibold text-green-700 dark:text-green-400" : ""}
+                className={option === q.answer ? "font-semibold text-accent-green" : "text-text-primary"}
               >
                 {String.fromCharCode(65 + j)}. {option}
               </li>
             ))}
           </ul>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{q.explanation}</p>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-text-secondary">{q.explanation}</p>
+          <p className="mt-1 text-xs text-text-muted">
             Sumber: {q.sources.map((s) => `hal. ${s.page}`).join(", ")}
           </p>
         </li>

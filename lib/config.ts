@@ -1,3 +1,5 @@
+import { MAX_PDF_BYTES_DEFAULT } from "./constants";
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -16,5 +18,5 @@ export const config = {
   chunkOverlap: Number(process.env.DEFAULT_CHUNK_OVERLAP ?? 200),
   topK: Number(process.env.DEFAULT_TOP_K ?? 5),
   maxRetrievalDistance: Number(process.env.MAX_RETRIEVAL_DISTANCE ?? 1.2),
-  maxPdfBytes: Number(process.env.MAX_PDF_BYTES ?? 25 * 1024 * 1024),
+  maxPdfBytes: Number(process.env.MAX_PDF_BYTES ?? MAX_PDF_BYTES_DEFAULT),
 };

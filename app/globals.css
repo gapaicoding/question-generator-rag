@@ -2,24 +2,85 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-page: #f5f7fc;
+  --bg-card: #ffffff;
+  --bg-raised: #f6f8fd;
+  --bg-hover: #eef2fa;
+  --border: #8192ad;
+  --text-primary: #17233a;
+  --text-secondary: #53627b;
+  --text-muted: #53627b;
+  --accent-blue: #246fd6;
+  --accent-purple: #9547f5;
+  --accent-green: #15803d;
+  --danger: #c8233f;
+  --danger-solid: #c8233f;
+  --gradient-primary: linear-gradient(100deg, #1e6fe0, #655cf7, #9547f5);
+
+  --background: var(--bg-page);
+  --foreground: var(--text-primary);
+}
+
+.dark {
+  --bg-page: #0a1020;
+  --bg-card: #111b2e;
+  --bg-raised: #152039;
+  --bg-hover: #1d2b47;
+  --border: #5c74a3;
+  --text-primary: #f4f7ff;
+  --text-secondary: #b6c5de;
+  --text-muted: #8d9dbb;
+  --accent-blue: #3290ff;
+  --accent-purple: #9547f5;
+  --accent-green: #22c987;
+  --danger: #ff596e;
+  --gradient-primary: linear-gradient(100deg, #1e6fe0, #655cf7, #9547f5);
 }
 
 @theme inline {
+  --color-bg-page: var(--bg-page);
+  --color-bg-card: var(--bg-card);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-hover: var(--bg-hover);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-green: var(--accent-green);
+  --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+* {
+  border-color: var(--border);
+}
+
+.btn-gradient {
+  background-image: var(--gradient-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

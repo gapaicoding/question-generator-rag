@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Search } from "lucide-react";
 
 interface SearchResult {
   content: string;
@@ -17,8 +18,7 @@ export function SearchPanel({ documentId }: { documentId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
+  async function runSearch() {
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
@@ -29,49 +29,71 @@ export function SearchPanel({ documentId }: { documentId: string }) {
         body: JSON.stringify({ document_id: documentId, query, top_k: 5 }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? "Search failed.");
+      if (!res.ok) throw new Error(data.detail ?? "Pencarian gagal.");
       setResults(data.results);
       setSearched(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Search failed.");
+      setError(err instanceof Error ? err.message : "Pencarian gagal.");
     } finally {
       setLoading(false);
     }
   }
 
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    runSearch();
+  }
+
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-500 p-4">
-      <h2 className="text-lg font-semibold">Cari materi (opsional)</h2>
-      <form onSubmit={handleSearch} className="flex gap-2">
+    <section className="flex flex-col gap-3 rounded-2xl border border-border bg-bg-card p-5">
+      <div>
+        <h2 className="text-lg font-semibold text-text-primary">Cari materi (opsional)</h2>
+        <p className="text-sm text-text-secondary">Tambahkan kata kunci untuk memfokuskan materi dari dokumen.</p>
+      </div>
+      <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="mis. sistem pernapasan"
-          className="flex-1 rounded border border-zinc-500 px-3 py-2 text-sm dark:bg-zinc-900"
+          aria-label="Kata kunci pencarian materi"
+          className="flex-1 rounded-lg border border-border bg-bg-raised px-3 py-2 text-sm text-text-primary placeholder:text-text-muted"
         />
         <button
           type="submit"
-          disabled={loading}
-          className="rounded border border-zinc-500 px-4 py-2 text-sm font-medium disabled:opacity-50"
+          disabled={loading || !query.trim()}
+          className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-accent-green px-4 text-sm font-medium text-accent-green disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "..." : "Cari"}
+          <Search className="h-4 w-4" aria-hidden />
+          {loading ? "Mencari..." : "Cari"}
         </button>
       </form>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {searched && results.length === 0 && !error && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Tidak ada hasil yang cocok dengan pencarian ini.</p>
-      )}
-      <ul className="flex flex-col gap-2">
-        {results.map((r, i) => (
-          <li key={i} className="rounded border border-zinc-500 p-2 text-sm">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Halaman {r.page} · jarak {r.distance.toFixed(2)}
-              {r.section && ` · ${r.section}`}
-            </p>
-            <p>{r.content}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
+
+      <div aria-live="polite" className="flex flex-col gap-3">
+        {error && (
+          <p className="text-sm text-danger">
+            {error}{" "}
+            <button type="button" onClick={runSearch} className="font-medium underline">
+              Coba lagi
+            </button>
+          </p>
+        )}
+        {searched && results.length === 0 && !error && (
+          <p className="text-sm text-text-secondary">Materi tidak ditemukan.</p>
+        )}
+        {results.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {results.map((r, i) => (
+              <li key={i} className="rounded-lg border border-border bg-bg-raised p-3 text-sm">
+                <p className="text-xs text-text-muted">
+                  Halaman {r.page} &middot; jarak {r.distance.toFixed(2)}
+                  {r.section && ` · ${r.section}`}
+                </p>
+                <p className="mt-1 text-text-primary">{r.content}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
