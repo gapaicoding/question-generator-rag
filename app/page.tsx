@@ -26,7 +26,7 @@ export default function Home() {
   const [topic, setTopic] = useState("");
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
-  const [model, setModel] = useState(GEMINI_MODELS[0].id);
+  const [model, setModel] = useState<string>(GEMINI_MODELS[0].id);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
