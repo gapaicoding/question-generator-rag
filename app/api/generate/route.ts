@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ detail: parsed.error.issues }, { status: 422 });
   }
-  const { document_id, topic, scope: requestedScopeInput, question_count, difficulty } = parsed.data;
+  const { document_id, topic, scope: requestedScopeInput, question_count, difficulty, model } = parsed.data;
 
   try {
     if (!(await exists(document_id))) {
@@ -76,16 +76,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const questions = await generateQuestions(topic, difficulty, question_count, chunks, scope);
+    const questions = await generateQuestions(topic, difficulty, question_count, chunks, scope, model);
 
     return NextResponse.json({ document_id, topic, difficulty, questions });
   } catch (err) {
     if (err instanceof GeminiError) {
-      return NextResponse.json({ detail: err.message }, { status: 503 });
+      const msg = err.message;
+      if (msg.includes("503") || msg.includes("high demand") || msg.includes("Service Unavailable")) {
+        return NextResponse.json({ detail: "Model AI sedang sibuk. Coba lagi dalam beberapa saat, atau pilih model lain dari dropdown." }, { status: 503 });
+      }
+      if (msg.includes("404") || msg.includes("no longer available")) {
+        return NextResponse.json({ detail: "Model yang dipilih tidak tersedia. Silakan pilih model lain." }, { status: 503 });
+      }
+      if (msg.includes("401") || msg.includes("403") || msg.includes("API key")) {
+        return NextResponse.json({ detail: "Autentikasi Gemini API gagal. Periksa konfigurasi GEMINI_API_KEY." }, { status: 503 });
+      }
+      return NextResponse.json({ detail: "Layanan AI tidak dapat dihubungi. Coba lagi dalam beberapa saat." }, { status: 503 });
     }
     if (err instanceof InvalidGeneration) {
-      return NextResponse.json({ detail: "LLM returned invalid structured output." }, { status: 502 });
+      return NextResponse.json({ detail: "AI menghasilkan output yang tidak valid. Coba generate ulang." }, { status: 502 });
     }
-    return NextResponse.json({ detail: "Question generation failed." }, { status: 500 });
+    return NextResponse.json({ detail: "Gagal membuat soal. Coba lagi." }, { status: 500 });
   }
 }

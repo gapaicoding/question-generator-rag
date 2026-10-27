@@ -32,12 +32,22 @@ export const SearchResponseSchema = z.object({
 });
 export type SearchResponse = z.infer<typeof SearchResponseSchema>;
 
+export const GEMINI_MODELS = [
+  { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash (Recommended)" },
+  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
+  { id: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+] as const;
+
+export const GEMINI_MODEL_IDS = GEMINI_MODELS.map((m) => m.id) as [string, ...string[]];
+
 export const GenerateRequestSchema = z.object({
   document_id: z.string(),
   topic: z.string().min(1).max(500),
   scope: z.string().max(100).nullable().optional(),
   question_count: z.number().int().min(1).max(20).default(5),
   difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+  model: z.enum(GEMINI_MODEL_IDS).optional(),
   type: z.literal("multiple_choice").default("multiple_choice"),
 });
 export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;

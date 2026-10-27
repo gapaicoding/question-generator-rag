@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added a **Model AI** dropdown to the Generate Soal form, letting users pick from five Gemini models (Gemini 2.5 Flash, 2.5 Pro, 2.0 Flash, 1.5 Flash, 1.5 Pro). The selected model is passed through the `/api/generate` route and used by `generateText` instead of always falling back to the server-side default.
+
 ### Changed
 
 - Redesigned the UI per `DESIGN.md` v3.0 ("Playful x Electric Blue"): warm cream background with white elevated cards, Electric Blue (`#0B72F9`) as the sole decorative accent, bold italic Inter typography for the wordmark and hero, numbered section markers (1-4), a two-column hero/upload row on desktop, and a complete token rename (`--surface`, `--primary`, `--danger`, etc. replacing the prior navy palette). Every color value was checked against the contrast script before use; several spec values needed a dedicated "solid" variant (`--primary-solid`, `--primary-text`, `--danger-solid`, `--border`, `--border-input`) to actually clear WCAG AA where the spec's own hex values fell short (white text on `#0B72F9` measured 4.38:1, spec borders measured ~1.3:1). Dark mode (kept from the prior round, not in the spec) got its own fully independent token set verified the same way, since automatic CSS inversion isn't accessible.

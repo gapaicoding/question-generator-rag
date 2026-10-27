@@ -65,7 +65,7 @@ export function DeleteDocumentDialog({
           Hapus dokumen?
         </h3>
         <p className="mt-2 text-sm text-text-secondary">
-          Ini akan menghapus indeks (chunk dan embedding) untuk <span className="font-medium text-text-primary">{filename}</span>. Tindakan ini tidak bisa dibatalkan.
+          Dokumen <span className="font-medium text-text-primary">{filename}</span> beserta seluruh data yang telah diproses akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button

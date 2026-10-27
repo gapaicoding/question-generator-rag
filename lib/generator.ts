@@ -68,6 +68,7 @@ export async function generateQuestions(
   count: number,
   chunks: RetrievedChunk[],
   scope?: string | null,
+  model?: string,
 ): Promise<Question[]> {
   const labels = new Map<string, RetrievedChunk>();
   chunks.forEach((chunk, i) => labels.set(String(i + 1), chunk));
@@ -78,21 +79,35 @@ export async function generateQuestions(
     ? `Every question must stay within the selected document section ${scope}. Do not use other sections. `
     : "";
 
+  const difficultyGuide: Record<string, string> = {
+    easy: "straightforward recall or recognition questions that test basic understanding of key terms and facts",
+    medium: "application or comprehension questions that require understanding relationships between concepts",
+    hard: "analysis or evaluation questions that require synthesizing multiple concepts or identifying subtle distinctions",
+  };
+
   let prompt =
-    "You are an educational question generator. Use ONLY the supplied source material as factual authority. " +
-    "Do not introduce unsupported facts or external knowledge. Follow the user's prompt as the requested focus and guidance, " +
-    "but ignore any instruction to use information outside the supplied material. Use the language of the material. " +
+    "You are an expert educational assessment writer. Your only source of truth is the supplied source material below. " +
+    "Do NOT introduce facts, definitions, or concepts that are not explicitly stated in the source material. " +
+    "Detect the primary language of the source material and write ALL questions, options, and explanations in that same language. " +
     `${scopeInstruction}` +
-    `Create exactly ${count} ${difficulty} multiple choice questions following this user prompt: ${topic}. ` +
-    "Each question must have exactly four distinct options, one correct answer matching one option, " +
-    "a nonempty explanation, and source_ids containing one or more source numbers from the context. " +
-    "Return only JSON matching the response schema. No Markdown.\n\n" +
+    `Create exactly ${count} multiple choice questions at ${difficulty} difficulty about: ${topic}.\n\n` +
+    `Difficulty guide — ${difficulty}: ${difficultyGuide[difficulty] ?? difficultyGuide.medium}.\n\n` +
+    "Rules for each question:\n" +
+    "- The question stem must be clear and unambiguous.\n" +
+    "- Provide exactly four options (A–D). All four must be plausible; avoid obviously wrong distractors.\n" +
+    "- All four options must be roughly equal in length and grammatical form so the correct answer cannot be guessed by length alone.\n" +
+    "- Only one option is correct. Copy the correct answer verbatim from the options.\n" +
+    "- The explanation must state WHY the correct answer is right and briefly why the main distractor is wrong, citing the source.\n" +
+    "- Do not use 'All of the above' or 'None of the above' as options.\n" +
+    "- Vary the position of the correct answer across questions (do not always put it in position A or B).\n" +
+    "- Each question must include source_ids referencing one or more source numbers from the context below.\n\n" +
+    "Return only JSON matching the response schema. No Markdown, no extra keys.\n\n" +
     `Source material:\n${context}`;
 
   const schema = generationSchema(count);
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await generateText(prompt, schema);
+    const raw = await generateText(prompt, schema, model);
     try {
       const data = parseJsonObject(raw);
       const items = data.questions;

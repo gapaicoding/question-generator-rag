@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Loader2 } from "lucide-react";
 import { UploadForm } from "@/components/UploadForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DocumentList, type DocumentSummary } from "@/components/DocumentList";
 import { SearchPanel } from "@/components/SearchPanel";
 import { QuestionList } from "@/components/QuestionList";
+import { GEMINI_MODELS } from "@/lib/schemas";
 
 interface Question {
   question: string;
@@ -25,6 +26,7 @@ export default function Home() {
   const [topic, setTopic] = useState("");
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [model, setModel] = useState(GEMINI_MODELS[0].id);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +87,7 @@ export default function Home() {
           topic,
           question_count: questionCount,
           difficulty,
+          model,
         }),
       });
       const data = await res.json();
@@ -198,6 +201,18 @@ export default function Home() {
                   <option value="hard">Hard</option>
                 </select>
               </label>
+              <label className="flex flex-col gap-1 text-sm text-text-secondary sm:col-span-2">
+                Model AI
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="rounded-xl border border-border-input bg-surface px-3 py-2 text-text-primary"
+                >
+                  {GEMINI_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <button
@@ -205,8 +220,17 @@ export default function Home() {
               disabled={generating || !topic.trim()}
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary-solid px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Sparkles className="h-4 w-4" aria-hidden />
-              {generating ? "Sedang membuat soal..." : "Generate Soal"}
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  <span className="animate-pulse">Sedang membuat soal...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                  Generate Soal
+                </>
+              )}
             </button>
 
             <div aria-live="polite">{error && <p className="text-sm text-danger">{error}</p>}</div>

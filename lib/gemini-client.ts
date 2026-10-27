@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, type Schema } from "@google/generative-ai";
 import { config } from "./config";
+import { GEMINI_MODEL_IDS } from "./schemas";
 
 export class GeminiError extends Error {}
 
@@ -38,10 +39,11 @@ export async function embed(texts: string[]): Promise<number[][]> {
   }
 }
 
-export async function generateText(prompt: string, responseSchema?: Schema): Promise<string> {
+export async function generateText(prompt: string, responseSchema?: Schema, modelOverride?: string): Promise<string> {
   try {
+    const chosenModel = modelOverride && (GEMINI_MODEL_IDS as readonly string[]).includes(modelOverride) ? modelOverride : config.geminiModel;
     const model = client.getGenerativeModel({
-      model: config.geminiModel,
+      model: chosenModel,
       generationConfig: {
         temperature: 0,
         responseMimeType: "application/json",
