@@ -24,11 +24,18 @@ export async function POST(request: Request) {
   const { document_id, topic, scope: requestedScopeInput, question_count, difficulty, model } = parsed.data;
 
   try {
-    if (!(await exists(document_id))) {
+    const requestedScope = requestedScopeInput || requestedSection(topic);
+
+    const retrievalQuery = `${requestedScope ?? ""} ${topic}`.trim();
+    const [docExists, [vector]] = await Promise.all([
+      exists(document_id),
+      embed([retrievalQuery]),
+    ]);
+
+    if (!docExists) {
       return NextResponse.json({ detail: "Document not found." }, { status: 404 });
     }
 
-    const requestedScope = requestedScopeInput || requestedSection(topic);
     let scope: string | null = null;
     if (requestedScope) {
       const indexedSections = await listSections(document_id);
@@ -42,9 +49,6 @@ export async function POST(request: Request) {
         }
       }
     }
-
-    const retrievalQuery = `${scope ?? ""} ${topic}`.trim();
-    const [vector] = await embed([retrievalQuery]);
 
     let chunks: RetrievedChunk[] = scope
       ? await search(document_id, vector, config.topK, scope)

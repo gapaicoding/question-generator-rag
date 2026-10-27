@@ -90,6 +90,10 @@ export default function Home() {
           model,
         }),
       });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server error (${res.status}). Coba lagi dalam beberapa saat.`);
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? "Gagal membuat soal.");
       setQuestions(data.questions);
